@@ -126,3 +126,6 @@ notebook or send it to the organizer.
 
 Please use only the bundled public dataset, not employer, customer, or
 personal data. Bring one forecasting question you would like to explore!
+
+## API Access and Credential Responsibility
+The event organizer is not responsible for any tokens or API credentials you share, or for any unauthorized access, usage, or charges resulting from that sharing.
