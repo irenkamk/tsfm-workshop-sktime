@@ -13,7 +13,7 @@ or nothing installed, go with **Google Colab** (option 1): it runs in your
 browser and needs no installation on your machine. Both routes use the same
 notebooks and cover the whole workshop.
 
-Please allow **20–40 minutes before the event** for setup and downloads;
+Please allow **about 20 minutes before the event** for setup and downloads;
 actual time depends on your internet speed.
 
 ## Option 1: Google Colab (nothing to install)
