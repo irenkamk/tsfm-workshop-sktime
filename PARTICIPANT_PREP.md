@@ -77,7 +77,7 @@ then:
 
 ```bash
 uv sync --locked --extra foundation
-uv run python scripts/check_environment.py --foundation
+uv run python scripts/check_environments.py --foundation
 ```
 
 Run the first command once. A later plain `uv sync` would remove the
@@ -94,7 +94,7 @@ Install only the core packages (about 1–2 GB):
 
 ```bash
 uv sync --locked
-uv run python scripts/check_environment.py
+uv run python scripts/check_environments.py
 ```
 
 You then run seasonal naive, ARIMA, and exponential smoothing yourself, and the
