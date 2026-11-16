@@ -34,8 +34,14 @@ CHECKPOINTS = {
     "t0-gamma": "theforecastingcompany/t0-gamma",
 }
 
+_AUTO_OFFLINE = False
 
 def load_series():
+    """Load the daily births CSV as a float series with a daily frequency.
+
+    Returns a `pd.Series` named "births" indexed by date. Raises ValueError
+    unless there are exactly 420 unique, complete, finite observations.
+    """
     frame = pd.read_csv(ROOT / "data/daily_births.csv", parse_dates=["date"])
     y = frame.set_index("date")["births"].astype(float).asfreq("D")
     if len(y) != 420 or not y.index.is_unique or not np.isfinite(y).all():
@@ -45,6 +51,12 @@ def load_series():
 
 
 def demo_split(y):
+    """Split the series into a single train/truth pair for the quick demo.
+
+    The demo uses the last development window before the benchmark folds:
+    returns (train, truth) where train is the CONTEXT observations preceding
+    the final HORIZON observations (truth) of the development data.
+    """
     development = y.iloc[: -N_FOLDS * HORIZON]
     return (
         development.iloc[-CONTEXT - HORIZON : -HORIZON],
@@ -53,16 +65,23 @@ def demo_split(y):
 
 
 def benchmark_series(y):
+    """Return the tail of `y` used for benchmarking: CONTEXT + N_FOLDS * HORIZON points."""
     return y.iloc[-(CONTEXT + N_FOLDS * HORIZON) :]
 
 
 def splitter():
+    """Build the sliding-window splitter shared by every model.
+
+    Each fold trains on CONTEXT points and forecasts HORIZON steps, moving
+    forward by HORIZON so test windows do not overlap.
+    """
     return SlidingWindowSplitter(
         fh=np.arange(1, HORIZON + 1), window_length=CONTEXT, step_length=HORIZON
     )
 
 
 def _hub_cache():
+    """Return the Hugging Face Hub cache directory."""
     hub = os.environ.get("HF_HUB_CACHE")
     if hub:
         return Path(hub)
@@ -71,11 +90,9 @@ def _hub_cache():
 
 
 def _is_cached(name):
+    """Check if the checkpoint for model `name` is fully cached locally."""
     repo = _hub_cache() / ("models--" + CHECKPOINTS[name].replace("/", "--"))
     return (repo / "refs/main").exists() and any(repo.glob("snapshots/*/config.json"))
-
-
-_AUTO_OFFLINE = False
 
 
 def _prefer_cached_weights(name):
@@ -100,6 +117,7 @@ def _prefer_cached_weights(name):
     _AUTO_OFFLINE = offline
 
 
+# TODO: drop this function? It's confusing and it makes the good look like AI slop.
 def _silence_dtype_notice():
     """sktime's Chronos-2 wrapper still passes `torch_dtype`; hide that one notice."""
     from transformers.utils import logging as hf_logging
@@ -114,6 +132,17 @@ def _silence_dtype_notice():
 
 
 def make_model(name, device="cpu", accept_t0_license=False):
+    """Create an unfitted sktime forecaster by name.
+
+    Args:
+        name: One of BASELINES, FOUNDATIONS, or "prophet".
+        device: Torch device for foundation models (e.g. "cpu", "cuda").
+        accept_t0_license: Must be True to use "t0-gamma"; confirms the
+            user has read and accepted its licenses.
+
+    Raises:
+        ValueError: For an unknown name, or t0-gamma without license acceptance.
+    """
     if name == "seasonal-naive":
         return NaiveForecaster(strategy="last", sp=SEASON)
     if name == "arima":
@@ -125,6 +154,7 @@ def make_model(name, device="cpu", accept_t0_license=False):
         return ExponentialSmoothing(
             trend="add", damped_trend=True, seasonal="add", sp=SEASON
         )
+    # TODO: Add Prophet in line #29,30 of this script, or remove it from here. Inconsistency!
     if name == "prophet":
         from sktime.forecasting.fbprophet import Prophet
 
@@ -169,6 +199,10 @@ def make_model(name, device="cpu", accept_t0_license=False):
 
 
 def validate_prediction(prediction, truth):
+    """Check a forecast matches the truth's timestamps, has HORIZON points, and is finite.
+
+    Raises ValueError on any mismatch.
+    """
     if not prediction.index.equals(truth.index):
         raise ValueError("Forecast timestamps do not match the evaluation timestamps.")
     if len(prediction) != HORIZON or not np.isfinite(prediction.to_numpy()).all():
@@ -176,7 +210,18 @@ def validate_prediction(prediction, truth):
 
 
 def run_benchmark(name, y, device="cpu", accept_t0_license=False, cv=None):
-    """Run three non-overlapping horizons; errors stop this model's evaluation."""
+    """Run three non-overlapping horizons; errors stop this model's evaluation.
+
+    Args:
+        name: Model name accepted by `make_model`.
+        y: Full series from `load_series`.
+        device, accept_t0_license: Passed to `make_model`.
+        cv: Optional splitter overriding the default `splitter()`.
+
+    Returns:
+        (scores, predictions): per-fold MAE/MASE/timings and per-date
+        actual vs. predicted values, both as DataFrames.
+    """
     model = make_model(name, device, accept_t0_license)
     frame = evaluate(
         forecaster=model, y=benchmark_series(y), cv=splitter() if cv is None else cv,
@@ -205,7 +250,13 @@ def run_benchmark(name, y, device="cpu", accept_t0_license=False, cv=None):
 
 
 def leaderboard(scores):
-    """Only compare models with complete, matching folds."""
+    """Summarise per-fold scores into a ranking, sorted by mean MAE.
+
+    Only compares models with complete, matching folds: each model needs
+    exactly three distinct folds on identical cutoffs and finite metrics,
+    otherwise ValueError is raised. Returns MAE/MASE means and summed
+    fit/predict seconds per model.
+    """
     required = {"model", "fold", "cutoff", "mae", "mase"}
     if not required.issubset(scores):
         raise ValueError(f"Scores require columns {required}.")
@@ -229,7 +280,18 @@ def leaderboard(scores):
 
 
 def save_run(name, y, output_dir, device="cpu", accept_t0_license=False):
-    """Save real demo predictions, fold scores, and provenance; never fake results."""
+    """Save real demo predictions, fold scores, and provenance; never fake results.
+
+    Fits the model for the demo split, runs the benchmark, and writes
+    demo.csv, scores.csv, predictions.csv and metadata.json (checkpoint
+    revision, data hash, package versions, timing) to a new `output_dir`.
+
+    Raises:
+        FileExistsError: If `output_dir` already exists.
+        RuntimeError: If a foundation model's cached revision is ambiguous.
+
+    Returns the per-fold scores DataFrame.
+    """
     output_dir = Path(output_dir)
     if output_dir.exists():
         raise FileExistsError(f"Choose a new run directory, not {output_dir}.")
@@ -285,7 +347,14 @@ def save_run(name, y, output_dir, device="cpu", accept_t0_license=False):
 
 
 def load_run(directory, y):
-    """Validate saved evidence against this exact dataset and protocol."""
+    """Validate saved evidence against this exact dataset and protocol.
+
+    Checks the data hash, protocol settings, model labels, fold dates,
+    actual values, cutoffs, and that saved scores recompute from the saved
+    predictions. Raises ValueError on any inconsistency.
+
+    Returns (scores, predictions, metadata) read from `directory`.
+    """
     directory = Path(directory)
     metadata = json.loads((directory / "metadata.json").read_text())
     digest = hashlib.sha256((ROOT / "data/daily_births.csv").read_bytes()).hexdigest()
