@@ -20,13 +20,16 @@ actual time depends on your internet speed.
 
 ## Option 1: Google Colab (nothing to install)
 
-1. Download and extract the setup ZIP. Keep the ZIP as well.
+1. Open https://github.com/irenkamk/tsfm-workshop-sktime , click the green
+   **Code** button → **Download ZIP**, and extract it. Keep the ZIP as well.
    Sign in to Google Colab: https://colab.research.google.com/
+   (Please do not use Colab's "connect to GitHub" popup: it asks for access to
+   all your repositories.)
 2. Use **File → Upload notebook** to open `notebooks/00_setup_check.ipynb`
    from the extracted folder. It has no exercises; it only installs and checks.
 3. **How to run a cell:** click inside it, then press **Shift+Enter** (or the
    ▶ button on its left). Run the first code cell. A **Choose Files** button
-   appears under the cell: click it and select the setup ZIP. Wait until it
+   appears under the cell: click it and select the ZIP you downloaded. Wait until it
    prints `Workshop files:`.
 4. In the install cell, set `INSTALL_CORE = True` and
    `INSTALL_FOUNDATION = True`, then run it. This installs the libraries for
@@ -52,27 +55,40 @@ works for you. If you want to keep your work, use
 ## Option 2: On your own computer
 
 You do **not** upload anything here: the notebook's upload step is only for
-Colab. Get the files onto your computer (download the ZIP from GitHub and
-extract it, or `git clone` the repository), then install uv using
-https://docs.astral.sh/uv/getting-started/installation/ . Open a terminal in
-the `tsfm-workshop` folder and run:
+Colab.
+
+**Please read this before you install.** The setup below installs everything,
+including the foundation-model libraries (PyTorch and friends), so you can
+**run the pretrained models yourself** in the workshop. You need
+**8–10 GB of free disk space**, and the installation may take around 15 minutes
+on a 100 Mbps connection (longer if yours is slower). The model weights, about
+2.3 GB in total, download the first time each model runs. These are estimates
+from one Linux machine, not guarantees; see `SETUP.md`. If you do not have that
+much space, use the lighter route at the end of this section instead.
+
+If you are fine with that, install uv using
+https://docs.astral.sh/uv/getting-started/installation/ , then clone the
+repository, open a terminal in it, and run:
+
+```bash
+git clone https://github.com/irenkamk/tsfm-workshop-sktime.git
+cd tsfm-workshop-sktime
+```
+
+then:
 
 ```bash
 uv sync --locked --extra foundation
-uv run --extra foundation python scripts/check_environment.py --foundation
-uv run --extra foundation jupyter lab
+uv run python scripts/check_environment.py --foundation
 ```
 
-This installs everything, including the foundation-model libraries (PyTorch
-and friends), so you can **run the pretrained models yourself** in the
-workshop. You need **8–10 GB of free disk space**, and the installation may take
-around 15 minutes on a 100 Mbps connection (longer if yours is slower). The
-model weights, about 2.3 GB in total, download the first time each model runs.
-These are estimates from one Linux machine, not guarantees; see `SETUP.md`.
+Run the first command once. A later plain `uv sync` would remove the
+foundation libraries again; if that happens, run the first command again.
 
-Seeing **BASELINE READY** and **FOUNDATION MODELS READY** means you are set. You
-can also open the notebooks in VS Code or PyCharm instead of Jupyter Lab;
-select the project's `.venv` as the notebook kernel. Python 3.12 is
+Seeing **BASELINE READY** and **FOUNDATION MODELS READY** means you are set;
+there is nothing else to open before the workshop. On the day you will open
+the notebooks with Jupyter Lab (`uv run jupyter lab`) or in VS Code or PyCharm,
+selecting the project's `.venv` as the notebook kernel. Python 3.12 is
 recommended; the project supports 3.11–3.13.
 
 **Not enough disk space or bandwidth?** You can still do the whole workshop.
@@ -81,7 +97,6 @@ Install only the core packages (about 1–2 GB):
 ```bash
 uv sync --locked
 uv run python scripts/check_environment.py
-uv run jupyter lab
 ```
 
 You then run seasonal naive, ARIMA, and exponential smoothing yourself, and the

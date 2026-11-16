@@ -1,4 +1,4 @@
-# Setup and rehearsal
+# Setup and troubleshooting
 
 ## What sktime does—and does not do
 
@@ -12,16 +12,18 @@ There are three separate stages: **install Python libraries → download model
 weights → run inference**. An import check verifies only the first.
 Hugging Face normally caches downloaded weights under
 `~/.cache/huggingface/hub` (or `HF_HOME`). Installing libraries alone is not a
-warm-up. The rehearsal commands below verify an actual forecast and all folds.
+warm-up: `scripts/check_environment.py` verifies imports, and each model's
+weights download the first time it runs.
 
 ## Google Colab (option 1: nothing to install locally)
 
-Upload notebook 1, then run its bootstrap cell and select the workshop ZIP.
+Upload `00_setup_check.ipynb`, then run its first cell and select the setup ZIP
+(on the day, the same cell in notebook 1 and 2 takes the full ZIP).
 The archive must contain the top-level `tsfm-workshop/` folder. This puts the
 data, helpers, requirements, and saved results next to the notebook runtime.
 Use only the organizer's trusted ZIP.
 
-Install core dependencies with the notebook's installation cell, or:
+Install with the notebook's installation cell (set the flags to `True`), or:
 
 ```python
 %pip install -r requirements/core.txt
@@ -68,12 +70,15 @@ For foundation models:
 
 ```bash
 uv sync --locked --extra foundation
-uv run --extra foundation python scripts/check_environment.py --foundation
-uv run --extra foundation jupyter lab
+uv run python scripts/check_environment.py --foundation
+uv run jupyter lab
 ```
 
-Keep `--extra foundation` on subsequent `uv run` commands, or uv may resync
-without that extra. The lock fixes the resolved local dependency graph;
+After `uv sync --locked --extra foundation`, plain `uv run` keeps the foundation
+packages (we checked that on one machine). A later plain `uv sync`, however,
+removes them; rerun the sync with `--extra foundation` if that happens.
+
+The lock fixes the resolved local dependency graph;
 Colab's requirements files pin the direct libraries but deliberately permit
 its compatible preinstalled torch. The two environments are not bit-identical.
 Record versions in the rehearsal artifacts rather than assuming equivalence.
@@ -101,23 +106,26 @@ and version-specific. Do not make MPS debugging part of this workshop.
 python -m venv .venv
 source .venv/bin/activate
 # Windows PowerShell: .venv\Scripts\Activate.ps1
-python -m pip install -r requirements/core.txt
+python -m pip install -r requirements/core.txt -r requirements/jupyter.txt
 python scripts/check_environment.py
 python -m jupyterlab
 ```
 
+`requirements/jupyter.txt` (JupyterLab and kernel tools) is only for local venvs;
+on Colab it is deliberately not installed, because it would replace Colab's own
+kernel packages and trigger the dependency-conflict errors.
 Optionally add `python -m pip install -r requirements/foundation.txt`.
 For Prophet only: `python -m pip install -r requirements/prophet.txt`.
 Prophet adds a Stan backend and possible platform friction, so it is bonus
 material rather than a prerequisite. In uv use `--extra prophet`.
 
-## Model downloads and instructor fallback
+## Model downloads
 
-A 120M-parameter fp32 model has about 0.48 GB of raw parameters; 200M has about
-0.8 GB; 256M about 1 GB. These are arithmetic estimates, **not measured peak
-RAM or download sizes**. Frameworks, activations, caches and model shards
-add overhead. Plan for 10–15 GB free disk for the full stack and cached models,
-and preferably 16 GB host RAM. Run one model at a time.
+On our Linux test machine the foundation libraries (PyTorch and its CUDA
+packages included) took about 5 GB, and the three models' weights are about
+2.3 GB (Chronos-2 about 0.46 GB, TimesFM 2.5 about 0.88 GB, t0-gamma about
+0.98 GB). Plan for **8–10 GB of free disk**, and preferably 16 GB RAM. Run one
+model at a time.
 
 The factories explicitly choose `amazon/chronos-2`,
 `google/timesfm-2.5-200m-transformers`, and
@@ -126,48 +134,17 @@ The t0 adapter defaults to alpha, and gamma needs `tfc-t0>=0.6.0`.
 TimesFM 2.5's transformers implementation needs a newer release than the
 adapter's broad minimum: this workshop pins transformers 5.23.0.
 
-In Colab, run the following in cells prefixed with `!`. Locally use
-`uv run --extra foundation python` instead of `python`:
-
-```bash
-python scripts/rehearse.py --model chronos2 --device cuda --output artifacts/chronos2
-python scripts/rehearse.py --model timesfm25 --device cuda --output artifacts/timesfm25
-# Only after reading/accepting the tfc-t0 and t0-gamma license:
-python scripts/rehearse.py --model t0-gamma --device cuda --accept-t0-license --output artifacts/t0-gamma
-```
-
-Each command is a new process, downloads/caches weights if needed, computes
-the demonstration and three backtest folds, and writes `demo.csv`,
-`scores.csv`, `predictions.csv`, and `metadata.json`. The metadata records
-versions, device, data hash, protocol, and the cached checkpoint revision.
-An existing output directory is rejected to prevent overwriting your evidence;
-use a fresh directory for a new run.
-
 **Offline after the first download.** Once a model's weights are cached,
 `workshop.py` automatically switches Hugging Face to offline mode for that
 model, so later runs make no Hub requests (and show no "unauthenticated
 requests" warning). The first run of each model needs internet; so do models
-not yet cached. To force this yourself, set `HF_HUB_OFFLINE=1` before starting
-Python or Jupyter; an explicit setting is never overridden. Red text in a
-notebook cell is only stderr (progress bars, warnings), not necessarily an error.
+not yet cached. To force offline mode yourself, set `HF_HUB_OFFLINE=1` before
+starting Python or Jupyter; an explicit setting is never overridden. Red text in
+a notebook cell is only stderr (progress bars, warnings), not necessarily an error.
 
-Do not substitute randomly initialized models, synthetic curves, or vendor
-benchmark scores for a failed model. Failures are visible; no result means
-"not evaluated". A model can be discussed without giving it a leaderboard rank.
-The factories load Hub `main`; record the resolved revision and preserve that
-cache/results for the session. For stronger future reproducibility, download
-the recorded revision into a local snapshot and use its path in the factory.
-
-Save the instructor's real result folders into the participant ZIP, then
-verify the saved-results cells in notebook 2. To repackage after rehearsal:
-
-```bash
-python scripts/package_workshop.py --output ../tsfm-workshop-ready.zip
-```
-
-This packages only workshop files, not your environment, credentials,
-downloaded weights, notebook outputs, or arbitrary local files. Distribute
-checkpoint licenses/weights only if you have independently checked their terms.
+If a model cannot run, the notebooks use the instructor's saved results and
+label a missing model "not evaluated". That is a full way to participate.
+t0-gamma needs you to read its license (Apache-2.0) and opt in explicitly.
 
 ## Troubleshooting and timeboxes
 
@@ -182,18 +159,3 @@ checkpoint licenses/weights only if you have independently checked their terms.
 | ARIMA convergence warning | Keep it visible. Discuss the fixed specification; do not secretly retune on test folds. |
 | ZIP is lost after reset | Upload again; local paths and HF cache are not persistent in Colab. |
 | All models beat/lose to naive | That is a valid local result. Explain the protocol and its limitations. |
-
-## Using the setup skill
-
-The included skill is a text artifact, not an account setting. For an agent
-that supports repository skills, keep
-`.github/skills/prepare-tsfm-workshop/SKILL.md` in the workshop repository.
-For an agent with user-level skills, copy that folder to the user skill
-directory documented by that agent. Do not assume every chat client loads
-skills or has terminal permissions.
-
-Then say: **"prepare me for foundation models for time series workshop"**.
-The skill checks the chosen environment, installs only the chosen track,
-checks readiness, and asks before accepting terms or downloading weights.
-It does not create a paid service, expose a notebook server, or change global
-Python settings.
