@@ -1,5 +1,3 @@
-# Send to participants: get ready to predict the future
-
 Hi everyone! For our **Can AI Predict the Future?** PyLadies workshop,
 please bring a laptop, charger, and a browser. We will use Python notebooks
 to compare simple forecasts with pretrained AI models.
