@@ -77,7 +77,7 @@ then:
 
 ```bash
 uv sync --locked --extra foundation
-uv run python scripts/check_environment.py --foundation
+uv run python scripts/check_environments.py --foundation
 ```
 
 Run the first command once. A later plain `uv sync` would remove the
@@ -94,7 +94,7 @@ Install only the core packages (about 1–2 GB):
 
 ```bash
 uv sync --locked
-uv run python scripts/check_environment.py
+uv run python scripts/check_environments.py
 ```
 
 You then run seasonal naive, ARIMA, and exponential smoothing yourself, and the
@@ -126,3 +126,6 @@ notebook or send it to the organizer.
 
 Please use only the bundled public dataset, not employer, customer, or
 personal data. Bring one forecasting question you would like to explore!
+
+## API Access and Credential Responsibility
+The event organizer is not responsible for any tokens or API credentials you share, or for any unauthorized access, usage, or charges resulting from that sharing.
