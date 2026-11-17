@@ -12,7 +12,7 @@ There are three separate stages: **install Python libraries → download model
 weights → run inference**. An import check verifies only the first.
 Hugging Face normally caches downloaded weights under
 `~/.cache/huggingface/hub` (or `HF_HOME`). Installing libraries alone is not a
-warm-up: `scripts/check_environment.py` verifies imports, and each model's
+warm-up: `scripts/check_environments.py` verifies imports, and each model's
 weights download the first time it runs.
 
 ## Google Colab (option 1: nothing to install locally)
@@ -41,7 +41,7 @@ files and caches. Rerun the bootstrap cell, leave installation flags false,
 and check:
 
 ```python
-!python scripts/check_environment.py --foundation
+!python scripts/check_environments.py --foundation
 ```
 
 Use Colab's preinstalled CUDA-enabled PyTorch if it satisfies the requirement.
@@ -62,7 +62,7 @@ From the extracted workshop folder:
 
 ```bash
 uv sync --locked --python 3.12
-uv run python scripts/check_environment.py
+uv run python scripts/check_environments.py
 uv run jupyter lab
 ```
 
@@ -70,7 +70,7 @@ For foundation models:
 
 ```bash
 uv sync --locked --extra foundation
-uv run python scripts/check_environment.py --foundation
+uv run python scripts/check_environments.py --foundation
 uv run jupyter lab
 ```
 
@@ -91,7 +91,7 @@ separate venv and the official CPU wheels, then install the requirements:
 uv venv --python 3.12 .venv-cpu
 uv pip install --python .venv-cpu/bin/python torch --index-url https://download.pytorch.org/whl/cpu
 uv pip install --python .venv-cpu/bin/python -r requirements/core.txt -r requirements/foundation.txt
-.venv-cpu/bin/python scripts/check_environment.py --foundation
+.venv-cpu/bin/python scripts/check_environments.py --foundation
 ```
 
 On Windows use `.venv-cpu\Scripts\python.exe`. This CPU-wheel route does not
@@ -107,7 +107,7 @@ python -m venv .venv
 source .venv/bin/activate
 # Windows PowerShell: .venv\Scripts\Activate.ps1
 python -m pip install -r requirements/core.txt -r requirements/jupyter.txt
-python scripts/check_environment.py
+python scripts/check_environments.py
 python -m jupyterlab
 ```
 
