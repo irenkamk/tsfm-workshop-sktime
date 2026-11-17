@@ -13,8 +13,9 @@ or nothing installed, go with **Google Colab** (option 1): it runs in your
 browser and needs no installation on your machine. Both routes use the same
 notebooks and cover the whole workshop.
 
-Please allow **about 20 minutes before the event** for setup and downloads;
-actual time depends on your internet speed.
+Please allow **about 20–40 minutes before the event** for setup and downloads.
+With a fast internet connection it can take much less, and most of that time
+is just waiting for downloads to finish.
 
 ## Option 1: Google Colab (nothing to install)
 
@@ -77,7 +78,7 @@ then:
 
 ```bash
 uv sync --locked --extra foundation
-uv run python scripts/check_environments.py --foundation
+uv run python scripts/check_environment.py --foundation
 ```
 
 Run the first command once. A later plain `uv sync` would remove the
@@ -94,7 +95,7 @@ Install only the core packages (about 1–2 GB):
 
 ```bash
 uv sync --locked
-uv run python scripts/check_environments.py
+uv run python scripts/check_environment.py
 ```
 
 You then run seasonal naive, ARIMA, and exponential smoothing yourself, and the
@@ -120,12 +121,22 @@ separate optional dependencies, and each model's pretrained weights download
 when it first loads. You do not need to train these models.
 
 No API keys are needed for the core or currently public model checkpoints.
-For t0, read the linked license before enabling its opt-in flag. If a service
+Running the t0-gamma model means you accept its license terms (the link is
+next to the code that loads it). If a service
 later requests authentication, ask for help—never paste a token into a shared
 notebook or send it to the organizer.
 
 Please use only the bundled public dataset, not employer, customer, or
 personal data. Bring one forecasting question you would like to explore!
 
-## API Access and Credential Responsibility
-The event organizer is not responsible for any tokens or API credentials you share, or for any unauthorized access, usage, or charges resulting from that sharing.
+## API keys, tokens and credentials
+
+This workshop does **not** use any API keys, access tokens, or other
+credentials, and you should not need to enter any. As a general precaution:
+
+- Never paste a token, password, or API key into a notebook, chat, or screenshot
+  that others can see, and never send one to the organizer.
+- If a download or service unexpectedly asks you to log in, stop and ask for
+  help first.
+- The organizer is not responsible for credentials you choose to share, or for
+  any unauthorized access, usage, or charges that result from sharing them.
