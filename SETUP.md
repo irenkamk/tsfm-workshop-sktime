@@ -12,7 +12,7 @@ There are three separate stages: **install Python libraries → download model
 weights → run inference**. An import check verifies only the first.
 Hugging Face normally caches downloaded weights under
 `~/.cache/huggingface/hub` (or `HF_HOME`). Installing libraries alone is not a
-warm-up: `scripts/check_environments.py` verifies imports, and each model's
+warm-up: `scripts/check_environment.py` verifies imports, and each model's
 weights download the first time it runs.
 
 ## Google Colab (option 1: nothing to install locally)
@@ -41,7 +41,7 @@ files and caches. Rerun the bootstrap cell, leave installation flags false,
 and check:
 
 ```python
-!python scripts/check_environments.py --foundation
+!python scripts/check_environment.py --foundation
 ```
 
 Use Colab's preinstalled CUDA-enabled PyTorch if it satisfies the requirement.
@@ -62,7 +62,7 @@ From the extracted workshop folder:
 
 ```bash
 uv sync --locked --python 3.12
-uv run python scripts/check_environments.py
+uv run python scripts/check_environment.py
 uv run jupyter lab
 ```
 
@@ -70,7 +70,7 @@ For foundation models:
 
 ```bash
 uv sync --locked --extra foundation
-uv run python scripts/check_environments.py --foundation
+uv run python scripts/check_environment.py --foundation
 uv run jupyter lab
 ```
 
@@ -91,7 +91,7 @@ separate venv and the official CPU wheels, then install the requirements:
 uv venv --python 3.12 .venv-cpu
 uv pip install --python .venv-cpu/bin/python torch --index-url https://download.pytorch.org/whl/cpu
 uv pip install --python .venv-cpu/bin/python -r requirements/core.txt -r requirements/foundation.txt
-.venv-cpu/bin/python scripts/check_environments.py --foundation
+.venv-cpu/bin/python scripts/check_environment.py --foundation
 ```
 
 On Windows use `.venv-cpu\Scripts\python.exe`. This CPU-wheel route does not
@@ -107,7 +107,7 @@ python -m venv .venv
 source .venv/bin/activate
 # Windows PowerShell: .venv\Scripts\Activate.ps1
 python -m pip install -r requirements/core.txt -r requirements/jupyter.txt
-python scripts/check_environments.py
+python scripts/check_environment.py
 python -m jupyterlab
 ```
 
@@ -144,7 +144,7 @@ a notebook cell is only stderr (progress bars, warnings), not necessarily an err
 
 If a model cannot run, the notebooks use the instructor's saved results and
 label a missing model "not evaluated". That is a full way to participate.
-t0-gamma needs you to read its license (Apache-2.0) and opt in explicitly.
+Running t0-gamma means you accept its license terms (linked in `workshop.py`).
 
 ## Troubleshooting and timeboxes
 
@@ -155,7 +155,7 @@ t0-gamma needs you to read its license (Apache-2.0) and opt in explicitly.
 | CUDA out of memory | Stop the run; use a fresh process/runtime for one model, or saved results. `del` alone may not release adapter caches. |
 | Download stalls / DNS failure | Check connectivity; use precomputed results after two minutes in class. |
 | HTTP 401/403 | Check current model card/access terms. Authenticate privately only if actually required. |
-| t0 license error | Read the upstream license and opt in explicitly; never bypass with `ignore_deps`. |
+| t0 license error | Read the upstream t0-gamma license; never bypass with `ignore_deps`. |
 | ARIMA convergence warning | Keep it visible. Discuss the fixed specification; do not secretly retune on test folds. |
 | ZIP is lost after reset | Upload again; local paths and HF cache are not persistent in Colab. |
 | All models beat/lose to naive | That is a valid local result. Explain the protocol and its limitations. |
