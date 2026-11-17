@@ -4,7 +4,6 @@ from importlib.metadata import version
 from pathlib import Path
 import hashlib
 import json
-import logging
 import os
 import platform
 import time
@@ -28,6 +27,7 @@ N_FOLDS = 3
 SEASON = 7
 BASELINES = ("seasonal-naive", "arima", "ets")
 FOUNDATIONS = ("chronos2", "timesfm25", "t0-gamma")
+OPTIONAL = ("prophet",)  # bonus model; needs `requirements/prophet.txt`
 CHECKPOINTS = {
     "chronos2": "amazon/chronos-2",
     "timesfm25": "google/timesfm-2.5-200m-transformers",
@@ -35,6 +35,7 @@ CHECKPOINTS = {
 }
 
 _AUTO_OFFLINE = False
+
 
 def load_series():
     """Load the daily births CSV as a float series with a daily frequency.
@@ -117,31 +118,15 @@ def _prefer_cached_weights(name):
     _AUTO_OFFLINE = offline
 
 
-# TODO: drop this function? It's confusing and it makes the good look like AI slop.
-def _silence_dtype_notice():
-    """sktime's Chronos-2 wrapper still passes `torch_dtype`; hide that one notice."""
-    from transformers.utils import logging as hf_logging
-
-    class _DtypeNotice(logging.Filter):
-        def filter(self, record):
-            return "`torch_dtype` is deprecated" not in record.getMessage()
-
-    for handler in hf_logging._get_library_root_logger().handlers:
-        if not any(isinstance(f, _DtypeNotice) for f in handler.filters):
-            handler.addFilter(_DtypeNotice())
-
-
-def make_model(name, device="cpu", accept_t0_license=False):
+def make_model(name, device="cpu"):
     """Create an unfitted sktime forecaster by name.
 
     Args:
-        name: One of BASELINES, FOUNDATIONS, or "prophet".
+        name: One of BASELINES, FOUNDATIONS, or OPTIONAL.
         device: Torch device for foundation models (e.g. "cpu", "cuda").
-        accept_t0_license: Must be True to use "t0-gamma"; confirms the
-            user has read and accepted its licenses.
 
     Raises:
-        ValueError: For an unknown name, or t0-gamma without license acceptance.
+        ValueError: For an unknown name.
     """
     if name == "seasonal-naive":
         return NaiveForecaster(strategy="last", sp=SEASON)
@@ -154,7 +139,6 @@ def make_model(name, device="cpu", accept_t0_license=False):
         return ExponentialSmoothing(
             trend="add", damped_trend=True, seasonal="add", sp=SEASON
         )
-    # TODO: Add Prophet in line #29,30 of this script, or remove it from here. Inconsistency!
     if name == "prophet":
         from sktime.forecasting.fbprophet import Prophet
 
@@ -166,7 +150,6 @@ def make_model(name, device="cpu", accept_t0_license=False):
     if name == "chronos2":
         import torch
 
-        _silence_dtype_notice()
         from sktime.forecasting.chronos2 import Chronos2Forecaster
 
         return Chronos2Forecaster(
@@ -184,12 +167,10 @@ def make_model(name, device="cpu", accept_t0_license=False):
             model_path=CHECKPOINTS[name], device_map=device, dtype="float32"
         )
     if name == "t0-gamma":
-        if not accept_t0_license:
-            raise ValueError(
-                "Read the tfc-t0 and t0-gamma licenses, then explicitly set "
-                "accept_t0_license=True if you accept them."
-            )
         from sktime.forecasting.t0 import T0Forecaster
+
+        # By running this, you agree to the t0-gamma license terms:
+        # https://huggingface.co/theforecastingcompany/t0-gamma
 
         return T0Forecaster(
             model_path=CHECKPOINTS[name], context_length=CONTEXT,
@@ -209,20 +190,20 @@ def validate_prediction(prediction, truth):
         raise ValueError("Forecast must have 14 finite daily predictions.")
 
 
-def run_benchmark(name, y, device="cpu", accept_t0_license=False, cv=None):
+def run_benchmark(name, y, device="cpu", cv=None):
     """Run three non-overlapping horizons; errors stop this model's evaluation.
 
     Args:
         name: Model name accepted by `make_model`.
         y: Full series from `load_series`.
-        device, accept_t0_license: Passed to `make_model`.
+        device: Passed to `make_model`.
         cv: Optional splitter overriding the default `splitter()`.
 
     Returns:
         (scores, predictions): per-fold MAE/MASE/timings and per-date
         actual vs. predicted values, both as DataFrames.
     """
-    model = make_model(name, device, accept_t0_license)
+    model = make_model(name, device)
     frame = evaluate(
         forecaster=model, y=benchmark_series(y), cv=splitter() if cv is None else cv,
         strategy="refit",
@@ -279,7 +260,7 @@ def leaderboard(scores):
     ).sort_values("MAE")
 
 
-def save_run(name, y, output_dir, device="cpu", accept_t0_license=False):
+def save_run(name, y, output_dir, device="cpu"):
     """Save real demo predictions, fold scores, and provenance; never fake results.
 
     Fits the model for the demo split, runs the benchmark, and writes
@@ -297,11 +278,11 @@ def save_run(name, y, output_dir, device="cpu", accept_t0_license=False):
         raise FileExistsError(f"Choose a new run directory, not {output_dir}.")
     start = time.perf_counter()
     train, truth = demo_split(y)
-    model = make_model(name, device, accept_t0_license)
+    model = make_model(name, device)
     model.fit(train, fh=np.arange(1, HORIZON + 1))
     pred = model.predict()
     validate_prediction(pred, truth)
-    scores, predictions = run_benchmark(name, y, device, accept_t0_license)
+    scores, predictions = run_benchmark(name, y, device)
     packages = ["sktime", "numpy", "pandas", "statsmodels"]
     if name in FOUNDATIONS:
         packages += ["torch", "transformers", "chronos-forecasting", "tfc-t0"]
