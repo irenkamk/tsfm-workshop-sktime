@@ -1,0 +1,24 @@
+{
+  "model": "chronos2",
+  "checkpoint": "amazon/chronos-2",
+  "checkpoint_revision": "29ec3766d36d6f73f0696f85560a422f50e8498c",
+  "created_utc": "2026-11-15T17:00:29.645267+00:00",
+  "data_sha256": "b328691f90aa25032e2b7772d9585399674fc915bec38e306925235065766671",
+  "context": 168,
+  "horizon": 14,
+  "folds": 3,
+  "device": "cpu",
+  "python": "3.12.3",
+  "versions": {
+    "sktime": "1.3.0",
+    "numpy": "2.2.6",
+    "pandas": "2.2.3",
+    "statsmodels": "0.14.6",
+    "torch": "2.15.0",
+    "transformers": "5.23.0",
+    "chronos-forecasting": "2.3.2",
+    "tfc-t0": "0.6.1"
+  },
+  "elapsed_seconds": 3.4257934452034533,
+  "source": "actual execution; not synthetic predictions"
+}

@@ -116,7 +116,9 @@ def setup():
         code("""
         import numpy as np
         import pandas as pd
-        import matplotlib.pyplot as plt
+        import plotly.express as px
+        import plotly.graph_objects as go
+        import plotly.io as pio
         from IPython.display import display, HTML
         from workshop import (
             load_series, demo_split, make_model, validate_prediction,
@@ -125,7 +127,40 @@ def setup():
         )
         if run([sys.executable, "scripts/check_environment.py"]):
             raise RuntimeError("The environment check failed. Read the messages above.")
-        plt.rcParams.update({"figure.figsize": (11, 4), "axes.grid": True, "font.size": 11})
+
+        # Plot helpers: one colour per entity, colour-blind-safe (Okabe-Ito).
+        pio.templates.default = "plotly_white"
+        BLUE, ORANGE, GREEN, INK = "#0072B2", "#D55E00", "#009E73", "#333333"
+        MODEL_COLORS = {
+            "seasonal-naive": ORANGE, "arima": "#E69F00", "ets": "#CC79A7",
+            "chronos2": GREEN, "timesfm25": "#56B4E9", "t0-gamma": BLUE,
+        }
+
+        def new_figure(title, ylabel="Births per day"):
+            fig = go.Figure()
+            fig.update_layout(
+                title=title, yaxis_title=ylabel, hovermode="x unified", height=380,
+                legend=dict(orientation="h", y=-0.2), margin=dict(t=60, b=40),
+            )
+            return fig
+
+        def add_line(fig, series, name, color, dash="solid", width=2, markers=False):
+            fig.add_scatter(
+                x=series.index, y=series.to_numpy(), name=name,
+                mode="lines+markers" if markers else "lines",
+                line=dict(color=color, dash=dash, width=width),
+            )
+
+        def mark_cutoff(fig, cutoff):
+            fig.add_shape(
+                type="line", x0=cutoff, x1=cutoff, y0=0, y1=1, yref="paper",
+                line=dict(color=ORANGE, dash="dot"),
+            )
+            fig.add_annotation(
+                x=cutoff, y=1, yref="paper", text="Forecast cutoff", showarrow=False,
+                xanchor="right", yanchor="top", font=dict(color="#666666"),
+            )
+
         y = load_series()
         milestones = {}
 
@@ -136,6 +171,12 @@ def setup():
                 f"<b>{len(milestones)}/4 milestones:</b> {message}"
             ))
             print("Completed:", ", ".join(milestones))
+        """),
+        md("""
+        > **Curious what a helper does?** Functions like `demo_split` or
+        > `leaderboard` come from `workshop.py`. In any cell, run
+        > `help(demo_split)` (or `demo_split?` in Jupyter) to read what it does.
+        > You never have to edit that file.
         """),
     ]
 
@@ -223,10 +264,45 @@ notebook1 = [
     print("Development range:", development.index.min(), "to", development.index.max())
     print("Daily frequency:", development.index.freqstr)
     display(development.head().to_frame())
-    ax = development.plot(label="Observed development data", color="#0072B2")
-    ax.set(title="What repeats? What might surprise a model?", ylabel="Births per day", xlabel="Date")
-    ax.legend()
-    plt.show()
+    """),
+    *exercise(
+        "Plot the series yourself (2 minutes)",
+        "Draw the development data as a line chart with `px.line(...)`. "
+        "Give it a title, then look: what repeats? What might surprise a model? "
+        "Hover, zoom, and drag over the chart to explore.",
+        """
+        fig = None  # Replace None with px.line(development, title="...")
+        assert fig is not None, "Hint: px.line(development, title=...)"
+        assert len(fig.data) == 1 and len(fig.data[0].y) == len(development), "Plot the whole development series once."
+        fig.update_layout(xaxis_title="Date", yaxis_title="Births per day")
+        fig.show()
+        """,
+        """
+        fig = px.line(development, title="What repeats? What might surprise a model?")
+        fig.update_layout(xaxis_title="Date", yaxis_title="Births per day")
+        fig.show()
+        """,
+        "`px.line` accepts a pandas Series directly: the index becomes the x axis.",
+    ),
+    code("""
+    weekday_names = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
+    frame = development.to_frame("births")
+    frame["weekday"] = frame.index.dayofweek
+    frame["week_start"] = frame.index - pd.to_timedelta(frame["weekday"].to_numpy(), unit="D")
+    by_week = frame.pivot(index="weekday", columns="week_start", values="births").dropna(axis=1)
+    fig = new_figure("Weeks look alike: one thin line per week (last 12), development data only")
+    for i, week in enumerate(by_week.columns[-12:]):
+        fig.add_scatter(
+            x=weekday_names, y=by_week[week], mode="lines", hoverinfo="skip",
+            name="Individual weeks", showlegend=(i == 0),
+            line=dict(color=BLUE, width=1), opacity=0.45,
+        )
+    fig.add_scatter(
+        x=weekday_names, y=by_week.mean(axis=1), name="Average week",
+        line=dict(color=INK, width=3),
+    )
+    fig.update_layout(xaxis_title="Day of week")
+    fig.show()
     """),
     *exercise(
         "Spot the weekly pattern (3 minutes)",
@@ -236,21 +312,23 @@ notebook1 = [
         weekday_means = None  # Group development by development.index.dayofweek, then mean
         assert weekday_means is not None, "Hint: development.groupby(...).mean()"
         assert len(weekday_means) == 7, "We need one average per weekday."
-        weekday_means.plot.bar(
+        fig = px.bar(
+            x=weekday_means.index, y=weekday_means.to_numpy(),
             title="Development data only: mean by weekday",
-            ylabel="Mean births per day", xlabel="Weekday: Monday=0",
+            labels={"x": "Weekday: Monday=0", "y": "Mean births per day"},
         )
-        plt.show()
+        fig.show()
         celebrate("detective", "You found structure worth forecasting.")
         """,
         """
         weekday_means = development.groupby(development.index.dayofweek).mean()
         assert len(weekday_means) == 7
-        weekday_means.plot.bar(
+        fig = px.bar(
+            x=weekday_means.index, y=weekday_means.to_numpy(),
             title="Development data only: mean by weekday",
-            ylabel="Mean births per day", xlabel="Weekday: Monday=0",
+            labels={"x": "Weekday: Monday=0", "y": "Mean births per day"},
         )
-        plt.show()
+        fig.show()
         celebrate("detective", "You found structure worth forecasting.")
         """,
         "Dates have `.dayofweek`; grouping is descriptive, not a forecast.",
@@ -295,12 +373,11 @@ notebook1 = [
         "`iloc[-14:]` selects the final 14 observations; the training slice stops before them.",
     ),
     code("""
-    ax = y_train.iloc[-42:].plot(label="Available history", color="#0072B2")
-    y_test.plot(ax=ax, label="Hidden future (revealed for scoring)", color="#333333", linestyle="--")
-    ax.axvline(y_train.index[-1], color="#D55E00", linestyle=":", label="Forecast cutoff")
-    ax.set(ylabel="Births per day", title="Ask: could I have known this value at the cutoff?")
-    ax.legend()
-    plt.show()
+    fig = new_figure("Ask: could I have known this value at the cutoff?")
+    add_line(fig, y_train.iloc[-42:], "Available history", BLUE)
+    add_line(fig, y_test, "Hidden future (revealed for scoring)", INK, dash="dash")
+    mark_cutoff(fig, y_train.index[-1])
+    fig.show()
     """),
     md("""
     ## 3. The baseline is a contestant, not a straw person (10 minutes)
@@ -342,13 +419,12 @@ notebook1 = [
     code("""
     from sktime.performance_metrics.forecasting import mean_absolute_error
     print(f"Demo seasonal-naive MAE: {mean_absolute_error(y_test, naive_pred):,.1f} births/day")
-    ax = y_train.iloc[-28:].plot(label="History", color="#0072B2")
-    y_test.plot(ax=ax, label="Actual", color="#333333", linewidth=2)
-    naive_pred.plot(ax=ax, label="Seasonal naive", color="#D55E00", linestyle="--", marker="o")
-    ax.axvline(y_train.index[-1], color="grey", linestyle=":")
-    ax.set(title="Baseline forecast: does the shape make sense?", ylabel="Births per day")
-    ax.legend()
-    plt.show()
+    fig = new_figure("Baseline forecast: does the shape make sense?")
+    add_line(fig, y_train.iloc[-28:], "History", BLUE)
+    add_line(fig, y_test, "Actual", INK, width=3)
+    add_line(fig, naive_pred, "Seasonal naive", ORANGE, dash="dash", markers=True)
+    mark_cutoff(fig, y_train.index[-1])
+    fig.show()
     """),
     md("""
     ## 4. A pretrained model joins (13 minutes)
@@ -369,7 +445,7 @@ notebook1 = [
     AI curve. The instructor must supply real model results from rehearsal.
     On a prepared GPU runtime, set `LIVE = True`.
 
-    t0 requires reading its current license and explicitly opting in.
+    Running t0-gamma means you accept its license terms (linked in `workshop.py`).
     Its public gamma checkpoint is selected explicitly; the adapter's default
     alpha is not gamma. Do not use `model_path=None`—that is an untrained model.
     """),
@@ -377,14 +453,13 @@ notebook1 = [
     CHOSEN_MODEL = "chronos2"  # Or "timesfm25" or "t0-gamma"
     LIVE = False
     DEVICE = "cpu"  # CPU is fine for this small series; use "cuda" on a GPU runtime
-    ACCEPT_T0_LICENSE = False  # Read upstream terms before changing this
     foundation_pred = None
     evidence_label = None
 
     if CHOSEN_MODEL not in FOUNDATIONS:
         raise ValueError("Choose chronos2, timesfm25, or t0-gamma.")
     if LIVE:
-        foundation = make_model(CHOSEN_MODEL, DEVICE, ACCEPT_T0_LICENSE)
+        foundation = make_model(CHOSEN_MODEL, DEVICE)
         foundation.fit(y_train, fh=fh)
         foundation_pred = foundation.predict()
         evidence_label = "live inference"
@@ -409,13 +484,13 @@ notebook1 = [
             print("or ask the instructor for rehearsal artifacts. No AI forecast is shown.")
     if foundation_pred is not None:
         validate_prediction(foundation_pred, y_test)
-        ax = y_train.iloc[-28:].plot(label="History", color="#0072B2")
-        y_test.plot(ax=ax, label="Actual", color="#333333", linewidth=2)
-        naive_pred.plot(ax=ax, label="Seasonal naive", color="#D55E00", linestyle="--")
-        foundation_pred.plot(ax=ax, label=CHOSEN_MODEL, color="#009E73", linestyle="-.", marker="o")
-        ax.set(title=f"{CHOSEN_MODEL}: {evidence_label}", ylabel="Births per day")
-        ax.legend()
-        plt.show()
+        fig = new_figure(f"{CHOSEN_MODEL}: {evidence_label}")
+        add_line(fig, y_train.iloc[-28:], "History", BLUE)
+        add_line(fig, y_test, "Actual", INK, width=3)
+        add_line(fig, naive_pred, "Seasonal naive", ORANGE, dash="dash")
+        add_line(fig, foundation_pred, CHOSEN_MODEL, GREEN, dash="dashdot", markers=True)
+        mark_cutoff(fig, y_train.index[-1])
+        fig.show()
         display(pd.Series({
             "seasonal-naive": mean_absolute_error(y_test, naive_pred),
             CHOSEN_MODEL: mean_absolute_error(y_test, foundation_pred),
@@ -513,6 +588,13 @@ notebook2 = [
         """,
         "The horizon is `np.arange(1, 15)`. Step length 14 avoids overlapping test windows.",
     ),
+    md("""
+    The workshop's own `splitter()` is what every model below is scored with.
+    Read its description and compare it with the one you just built:
+    """),
+    code("""
+    help(splitter)
+    """),
     code("""
     schedule = pd.DataFrame([
         {"fold": number, "context_start": evaluation_y.index[tr[0]],
@@ -591,7 +673,6 @@ notebook2 = [
     RUN_ASSIGNED_MODEL = False
     ASSIGNED_MODEL = "chronos2"
     DEVICE = "cpu"  # "cuda" on a GPU runtime
-    ACCEPT_T0_LICENSE = False
     if RUN_ASSIGNED_MODEL:
         if ASSIGNED_MODEL not in FOUNDATIONS:
             raise ValueError("Choose a foundation model from FOUNDATIONS.")
@@ -603,10 +684,6 @@ notebook2 = [
                 sys.executable, "scripts/rehearse.py", "--model", ASSIGNED_MODEL,
                 "--device", DEVICE, "--output", str(live_dir),
             ]
-            if ASSIGNED_MODEL == "t0-gamma":
-                if not ACCEPT_T0_LICENSE:
-                    raise ValueError("Read the t0 license and explicitly opt in first.")
-                command.append("--accept-t0-license")
             if run(command):
                 raise RuntimeError("The model run failed. Read the messages above.")
     """, tags=["optional-foundation"]),
@@ -661,6 +738,19 @@ notebook2 = [
         """,
         "Use `all_scores.groupby('model')['mae'].mean().sort_values()`; normalize by naive.",
     ),
+    code("""
+    fig = go.Figure(go.Bar(
+        x=improvement_percent.index, y=improvement_percent.to_numpy(),
+        marker_color=[MODEL_COLORS.get(m, "#999999") for m in improvement_percent.index],
+        text=[f"{v:+.1f}%" for v in improvement_percent], textposition="outside",
+    ))
+    fig.update_layout(
+        title="Improvement over seasonal naive (above 0 = better, below 0 = worse)",
+        yaxis_title="Improvement in mean MAE (%)", height=380, margin=dict(t=60),
+    )
+    fig.add_hline(y=0, line_color=INK)
+    fig.show()
+    """),
     md("""
     ## 4. A mean can hide a fragile winner (8 minutes)
     Look at each fold, not only the average. Three dependent time-series
@@ -673,20 +763,47 @@ notebook2 = [
     display(leaderboard(all_scores).round(2))
     fold_errors = all_scores.pivot(index="fold", columns="model", values="mae")
     display(fold_errors.round(1))
-    fold_errors.plot.bar(title="Does the winner change by forecast origin?", ylabel="MAE (births/day)")
-    plt.xticks(rotation=0)
-    plt.show()
+    fig = go.Figure([
+        go.Bar(x=[f"Fold {f}" for f in fold_errors.index], y=fold_errors[m], name=m,
+               marker_color=MODEL_COLORS.get(m, "#999999"))
+        for m in fold_errors.columns
+    ])
+    fig.update_layout(
+        barmode="group", title="Does the winner change by forecast origin?",
+        yaxis_title="MAE (births/day)", height=380, margin=dict(t=60),
+    )
+    fig.show()
 
     selected_fold = 3  # Try 1 or 2 after inspecting the score table
     part = all_predictions.loc[all_predictions["fold"] == selected_fold].copy()
     part["date"] = pd.to_datetime(part["date"])
     actual = part.drop_duplicates("date").set_index("date")["actual"]
-    ax = actual.plot(label="Actual", color="black", linewidth=3)
+    fig = new_figure(f"Fold {selected_fold}: shape, timing, and misses")
+    add_line(fig, actual, "Actual", INK, width=4)
     for name, group in part.groupby("model"):
-        group.set_index("date")["prediction"].plot(ax=ax, label=name, linestyle="--", marker=".")
-    ax.set(title=f"Fold {selected_fold}: shape, timing, and misses", ylabel="Births per day")
-    ax.legend()
-    plt.show()
+        add_line(
+            fig, group.set_index("date")["prediction"], name,
+            MODEL_COLORS.get(name, "#999999"), dash="dash", markers=True,
+        )
+    fig.show()
+    """),
+    md("""
+    Do errors grow the further ahead we forecast? Each line averages the
+    absolute error at day 1, day 2, ... day 14 across the three folds.
+    Look for a steady climb, then look for a **spike**: what could happen on
+    one specific day that no model was told about?
+    """),
+    code("""
+    errors = all_predictions.sort_values(["model", "fold", "date"]).copy()
+    errors["abs_error"] = (errors["prediction"] - errors["actual"]).abs()
+    errors["days_ahead"] = errors.groupby(["model", "fold"]).cumcount() + 1
+    by_step = errors.groupby(["model", "days_ahead"])["abs_error"].mean().reset_index()
+    fig = new_figure("Error by days ahead: a steady climb, or a spike?", ylabel="Mean absolute error (births/day)")
+    for name, group in by_step.groupby("model"):
+        add_line(fig, group.set_index("days_ahead")["abs_error"], name,
+                 MODEL_COLORS.get(name, "#999999"), markers=True)
+    fig.update_layout(xaxis_title="Days ahead")
+    fig.show()
     """),
     md("""
     ### YOUR TURN — make a recommendation (3 minutes)

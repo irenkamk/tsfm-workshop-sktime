@@ -269,7 +269,7 @@ ranking. Native capabilities do not automatically flow through every wrapper.
 | sktime interval interface here | No | Yes | Yes |
 | sktime exogenous interface here | Yes | No | Yes, with required history/future coverage |
 | Important wrapper caveat | Native quantiles not exposed as intervals | Use the transformers 2.5 checkpoint; no XReg through this adapter | Defaults to alpha; multi-column y processed independently |
-| Live classroom plan | One assigned model or saved results | One assigned model or saved results | One assigned model or saved results, explicit license opt-in |
+| Live classroom plan | One assigned model or saved results | One assigned model or saved results | One assigned model or saved results, license terms apply |
 
 CPU execution can be possible for these libraries, but "possible" and
 "comfortable for every learner in 90 minutes" are different requirements.
