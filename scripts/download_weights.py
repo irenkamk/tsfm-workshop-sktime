@@ -8,9 +8,9 @@ from workshop import CHECKPOINTS, FOUNDATIONS  # import first: it disables HF te
 from huggingface_hub import snapshot_download
 
 parser = argparse.ArgumentParser(description=__doc__)
-parser.add_argument("models", nargs="*", choices=FOUNDATIONS, default=list(FOUNDATIONS))
+parser.add_argument("models", nargs="*", choices=FOUNDATIONS)
 args = parser.parse_args()
-for name in args.models:
+for name in args.models or FOUNDATIONS:
     print(f"Downloading {name} ({CHECKPOINTS[name]}) ...")
     snapshot_download(CHECKPOINTS[name])
 print("WEIGHTS READY: later runs of these models need no download.")

@@ -9,11 +9,13 @@ wrappers it loads pretrained weights and stores the observed context, without
 training new weights on our dataset.
 
 There are three separate stages: **install Python libraries → download model
-weights → run inference**. An import check verifies only the first.
+weights → run inference**. `--foundation` verifies only the first (imports);
+`--weights` verifies all three by running each model on the downloaded weights.
 Hugging Face normally caches downloaded weights under
 `~/.cache/huggingface/hub` (or `HF_HOME`). Installing libraries alone is not a
-warm-up: `scripts/check_environment.py` verifies imports, and each model's
-weights download the first time it runs.
+warm-up: `scripts/check_environment.py --foundation` verifies imports, and each
+model's weights download the first time it runs (or via
+`scripts/download_weights.py`).
 
 ## Google Colab (option 2: nothing to install locally)
 
@@ -72,8 +74,15 @@ For foundation models:
 uv sync --locked --extra foundation
 uv run python scripts/check_environment.py --foundation
 uv run python scripts/download_weights.py
+uv run python scripts/check_environment.py --weights
 uv run jupyter lab
 ```
+
+`check_environment.py --weights` never downloads anything. It requires all
+three models' weights in the local cache, runs a real 14-day forecast with each
+one offline (well under a minute on CPU), and exits non-zero naming any model
+whose weights are missing or incomplete. Use `--foundation` alone (imports only)
+where weights are not downloaded yet, as in the Colab setup notebook.
 
 After `uv sync --locked --extra foundation`, plain `uv run` keeps the foundation
 packages (we checked that on one machine). A later plain `uv sync`, however,
@@ -83,6 +92,30 @@ The lock fixes the resolved local dependency graph;
 Colab's requirements files pin the direct libraries but deliberately permit
 its compatible preinstalled torch. The two environments are not bit-identical.
 Record versions in the rehearsal artifacts rather than assuming equivalence.
+
+**Windows: "torch ... doesn't have a source distribution or wheel for the
+current platform".** PyTorch publishes only 64-bit Windows wheels. This error
+means uv picked a 32-bit Python, usually because uv itself is a 32-bit build
+(for example installed with `pip` into a 32-bit Python). Check
+`uv --version`: it must end in `x86_64-pc-windows-msvc`, not `i686-...`.
+Fix it by installing the 64-bit uv, then recreate the environment, because uv
+reuses an existing `.venv`:
+
+```powershell
+pip uninstall uv                       # only if uv came from pip
+winget install --id=astral-sh.uv -e    # or the installer from docs.astral.sh/uv
+Remove-Item -Recurse -Force .venv
+uv sync --locked --extra foundation
+```
+
+Workaround without replacing uv (works from any uv build):
+
+```powershell
+uv python install cpython-3.13-windows-x86_64-none
+uv sync --locked --extra foundation --python cpython-3.13-windows-x86_64-none
+```
+
+Linux and macOS are not affected.
 
 On local Linux, the default torch distribution may also install large CUDA
 libraries even when you use CPU. For CPU-only optional exploration, use a
@@ -160,6 +193,7 @@ Running t0-gamma means you accept its license terms (linked in `workshop.py`).
 | `No module named workshop` | Run the bootstrap; confirm current folder contains `workshop.py`. |
 | TimesFM class missing | Check transformers version, restart after installation, run adapter check. |
 | CUDA out of memory | Stop the run; use a fresh process/runtime for one model, or saved results. `del` alone may not release adapter caches. |
+| Windows: `torch` "doesn't have a ... wheel for the current platform" | 32-bit uv/Python. See the Windows note under "Local uv": install the 64-bit uv and delete `.venv`. |
 | Download stalls / DNS failure | Check connectivity; use precomputed results after two minutes in class. |
 | HTTP 401/403 | Check current model card/access terms. Authenticate privately only if actually required. |
 | t0 license error | Read the upstream t0-gamma license; never bypass with `ignore_deps`. |

@@ -50,18 +50,37 @@ then:
 uv sync --locked --extra foundation
 uv run python scripts/check_environment.py --foundation
 uv run python scripts/download_weights.py
+uv run python scripts/check_environment.py --weights
 ```
 
 Run the first command once. A later plain `uv sync` would remove the
 foundation libraries again; if that happens, run the first command again.
-The last command downloads the weights of the three pretrained models
+The third command downloads the weights of the three pretrained models
 (about 2.3 GB) into your Hugging Face cache and prints **WEIGHTS READY** when
 it is done. Running t0-gamma means you accept its license terms (see
-"What not to worry about" below). After that the models run without
-downloading anything, even without internet.
+"What not to worry about" below). The last command double-checks everything:
+it runs each of the three models once on the downloaded weights, offline (under
+a minute), and stops with a message naming any model whose weights are missing
+or broken; if that happens, run the third command again. After that the models
+run without downloading anything, even without internet.
+
+**Windows only:** if `uv sync` stops with an error saying `torch` "doesn't
+have a source distribution or wheel for the current platform", your uv or
+Python is 32-bit (this happens when uv was installed with `pip`). Run
+`uv --version`: it should end in `x86_64-pc-windows-msvc`. Install the 64-bit
+uv with `winget install --id=astral-sh.uv -e` (and `pip uninstall uv` if you
+had installed it with pip), delete the `.venv` folder in the project, and run
+`uv sync --locked --extra foundation` again. Quick alternative without
+reinstalling uv:
+
+```powershell
+uv python install cpython-3.13-windows-x86_64-none
+uv sync --locked --extra foundation --python cpython-3.13-windows-x86_64-none
+```
 
 Seeing **BASELINE READY**, **FOUNDATION MODELS READY** and **WEIGHTS READY**
-means you are set; there is nothing else to open before the workshop. On the
+from the last command means you are set; there is nothing else to open before
+the workshop. On the
 day you will open the notebooks with Jupyter Lab (`uv run jupyter lab`) or in
 VS Code or PyCharm, selecting the project's `.venv` as the notebook kernel.
 Python 3.12 is recommended; the project supports 3.11–3.13.

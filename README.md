@@ -22,7 +22,7 @@ This repository holds everything you need **before** the workshop:
 | `notebooks/00_setup_check.ipynb` | Install and readiness check (no exercises) |
 | `workshop.py` | Shared model factories and the single `sktime.evaluate` benchmark |
 | `data/` | The bundled public dataset (daily U.S. births) with attribution |
-| `scripts/` | `check_environment.py` (readiness check), `download_weights.py` (fetch model weights) and `rehearse.py` (run one model) |
+| `scripts/` | `check_environment.py` (readiness check; `--foundation` for imports, `--weights` to also verify the downloaded weights), `download_weights.py` (fetch model weights) and `rehearse.py` (run one model) |
 
 The lesson notebooks, slides, and a tutorial guide are shared on the day.
 Exercise cells there are marked **YOUR TURN** and contain `None` placeholders
