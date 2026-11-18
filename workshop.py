@@ -8,6 +8,9 @@ import os
 import platform
 import time
 
+# Hugging Face libraries read this at import time, so set it before any of them load.
+os.environ.setdefault("HF_HUB_DISABLE_TELEMETRY", "1")
+
 import numpy as np
 import pandas as pd
 from sktime.forecasting.exp_smoothing import ExponentialSmoothing
