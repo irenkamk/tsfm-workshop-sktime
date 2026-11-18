@@ -15,7 +15,7 @@ Hugging Face normally caches downloaded weights under
 warm-up: `scripts/check_environment.py` verifies imports, and each model's
 weights download the first time it runs.
 
-## Google Colab (option 1: nothing to install locally)
+## Google Colab (option 2: nothing to install locally)
 
 Upload `00_setup_check.ipynb`, then run its first cell and select the setup ZIP
 (on the day, the same cell in notebook 1 and 2 takes the full ZIP).
@@ -71,6 +71,7 @@ For foundation models:
 ```bash
 uv sync --locked --extra foundation
 uv run python scripts/check_environment.py --foundation
+uv run python scripts/download_weights.py
 uv run jupyter lab
 ```
 
@@ -141,6 +142,12 @@ requests" warning). The first run of each model needs internet; so do models
 not yet cached. To force offline mode yourself, set `HF_HUB_OFFLINE=1` before
 starting Python or Jupyter; an explicit setting is never overridden. Red text in
 a notebook cell is only stderr (progress bars, warnings), not necessarily an error.
+
+**No usage telemetry.** `workshop.py` sets `HF_HUB_DISABLE_TELEMETRY=1` before any
+Hugging Face library loads, so the workshop scripts and notebooks send no usage
+data to Hugging Face. This applies only to code that imports `workshop`; it does not
+change your machine's settings. Downloading weights still contacts the Hub (that is
+the point), and an explicit `HF_HUB_DISABLE_TELEMETRY` value you set is kept.
 
 If a model cannot run, the notebooks use the instructor's saved results and
 label a missing model "not evaluated". That is a full way to participate.

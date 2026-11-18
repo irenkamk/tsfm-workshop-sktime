@@ -17,12 +17,12 @@ This repository holds everything you need **before** the workshop:
 
 | File | Purpose |
 |---|---|
-| `PARTICIPANT_PREP.md` | **Start here**: setup instructions for Colab or local |
+| `PARTICIPANT_PREP.md` | **Start here**: setup instructions for local or Colab |
 | `SETUP.md` | Reference: Colab, local uv/venv, model downloads, troubleshooting |
 | `notebooks/00_setup_check.ipynb` | Install and readiness check (no exercises) |
 | `workshop.py` | Shared model factories and the single `sktime.evaluate` benchmark |
 | `data/` | The bundled public dataset (daily U.S. births) with attribution |
-| `scripts/` | `check_environment.py` (readiness check) and `rehearse.py` (run one model) |
+| `scripts/` | `check_environment.py` (readiness check), `download_weights.py` (fetch model weights) and `rehearse.py` (run one model) |
 
 The lesson notebooks, slides, and a tutorial guide are shared on the day.
 Exercise cells there are marked **YOUR TURN** and contain `None` placeholders
@@ -34,19 +34,23 @@ finishing a learning step, not on beating another participant.
 
 Repository: https://github.com/irenkamk/tsfm-workshop-sktime
 
-Choose **Colab** (nothing to install; good for beginners) or **local** (if you
-already use an IDE or have Python set up). Both cover the whole workshop and no
+Choose **local** (if you already use an IDE or have Python set up) or **Colab**
+(nothing to install; good for beginners). Both cover the whole workshop and no
 GPU is needed.
 
-- **Colab:** on the repository page click the green **Code** button →
-  **Download ZIP**, then follow Option 1 in `PARTICIPANT_PREP.md`.
-- **Local:** clone the repository, then follow Option 2 in
+- **Local:** clone the repository, then follow Option 1 in
   `PARTICIPANT_PREP.md`:
 
   ```bash
   git clone https://github.com/irenkamk/tsfm-workshop-sktime.git
   cd tsfm-workshop-sktime
   ```
+
+  The setup there also downloads the model weights, so install everything
+  before the workshop.
+- **Colab:** on the repository page click the green **Code** button →
+  **Download ZIP**, then follow Option 2 in `PARTICIPANT_PREP.md` just to get
+  familiar with it; the requirements are installed on the day.
 
 The local setup installs the foundation-model libraries too, which needs
 8–10 GB of free disk; `PARTICIPANT_PREP.md` explains this and a lighter route.
