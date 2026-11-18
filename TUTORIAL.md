@@ -1,73 +1,77 @@
 # Can AI Predict the Future? A practical model guide
 
-**Reading date: 15 November 2026.** This guide deliberately teaches the
-requested Chronos-2, TimesFM **2.5**, and **t0-gamma**, not whichever checkpoint
-is newest. Package pins and wrapper behavior refer to sktime **1.3.0**.
-Upstream software, model cards, access rules, and hosted services can change.
-Official repositories/source were inspected; links to papers and model cards
-are supplied below. Hugging Face and some external documentation hosts were
-unreachable from the authoring environment, so this is not a claim that every
-linked page or pretrained inference path was independently exercised.
+**Reading date: 15 November 2026.** This guide covers the three models we use
+in the workshop: Chronos-2, TimesFM **2.5** and **t0-gamma**. It does not cover
+whichever checkpoint is newest. Package versions and wrapper behavior refer to
+sktime **1.3.0**. Software, model cards, access rules and hosted services can
+change.
 
-## 1. What question are we actually answering?
+The official repositories and source code were inspected. Papers and model
+cards are linked below. Hugging Face and some other documentation sites could
+not be reached from where this guide was written. So not every link was opened,
+and not every pretrained model was run end to end.
 
-A forecast is a conditional estimate of future outcomes given the information
-available at a particular time. It is not knowledge of the future.
-Before choosing an algorithm, specify the target, frequency, forecast origin,
-horizon, information available at that origin, and the cost of being wrong.
+## 1. What question are we answering?
 
-Our teaching question: **given the preceding 168 daily U.S. birth counts,
-forecast the next 14 days**. We compare models on three later origins with
-the same context and no external covariates. We use one small, complete,
-attributed dataset, bundled so data access cannot derail the session.
+A forecast is an estimate of future values, based on what we know at a given
+time. It is not knowledge of the future. Before you choose a model, write down
+the target, how often it is measured, the cutoff, the horizon, what you know
+at the cutoff, and what a wrong forecast costs.
 
-Daily sampling is not the same as weekly seasonality. Aggregating to weekly
-totals would reduce the number of observations but remove the weekday/weekend
-pattern. Daily data plus a short context makes both the task and the baseline
-more intuitive.
+Our question: **given the previous 168 daily U.S. birth counts, forecast the
+next 14 days.** We compare models at three later cutoffs, with the same
+training data and no extra variables (covariates). The dataset is small,
+complete and has a clear source. It is bundled with the workshop, so a data
+download cannot break the session.
 
-## 2. Foundation model does not mean "no assumptions"
+Daily data and weekly seasonality are different things. Adding the days up to
+weekly totals would leave fewer observations and remove the weekday and
+weekend pattern. Daily data with a short context makes both the task and the
+baseline easier to follow.
 
-A **local model** learns its parameters from the target series. A **global
-model** learns across multiple series. A **foundation model** is pretrained
-on a broad collection and designed for reuse across tasks or datasets.
-These categories overlap; "foundation" is not a guarantee of superiority.
+## 2. What a foundation model is, and what it is not
 
-**Zero-shot forecasting** here means applying pretrained weights without
-task-specific gradient updates. The model still consumes a context window.
-It may scale values, split them into patches, attend over the context, and
-produce points or quantiles. Loading a checkpoint is not training.
-Calling an API method named `fit` does not by itself imply fine-tuning.
+A **local model** learns its numbers (parameters) from the one series you give
+it. A **global model** learns from many series. A **foundation model** is
+trained once on a very large and varied collection of series, and then reused
+on new data. These groups overlap. "Foundation" does not mean "better".
 
-**Pretraining contamination:** old public datasets can appear in training
-corpora. We cannot certify that this series was unseen during pretraining.
-Leak-free workshop splits prevent our own look-ahead, not unknown exposure
-in a vendor's pretraining pipeline.
+**Zero-shot forecasting** means we use the pretrained model as it is, without
+training it further on our task. The model still reads a window of recent
+history. It may rescale the values, cut them into patches, look across the
+window, and return one forecast or quantiles. Loading a model is not training
+it. A method called `fit` does not mean the model is being fine-tuned.
 
-**Patches** group consecutive numeric observations into tokens. **Attention**
-lets representations use other relevant tokens. **Time attention** exchanges
-information across time; **group/variate attention** can exchange it across
-related variables. This is not the same as text tokenization, and not every
-time-series foundation model follows the original Chronos design.
+**Training data overlap:** old public datasets can be part of what a model was
+trained on. We cannot say that this series was not. Our leak-free splits stop
+*us* from looking ahead. They cannot rule out that the model has seen these
+days before.
 
-## 3. Don't skip the classical contestants
+A **patch** is a short block of consecutive values that the model treats as one
+unit. **Attention** lets the model look at other relevant parts of its input.
+**Time attention** looks across time. **Group or variate attention** can look
+across related variables. This is not the same as splitting text into tokens,
+and not every time-series foundation model works like the original Chronos.
 
-| Model | How it forecasts | What we use | Strengths and limitations |
+## 3. Do not skip the classical models
+
+| Model | How it forecasts | What we use | Strengths and limits |
 |---|---|---|---|
-| Seasonal naive | Repeat the last observed seasonal cycle | `NaiveForecaster(strategy="last", sp=7)` | Almost no setup; strong when weeks repeat; cannot anticipate new trends or special days |
-| ARIMA/SARIMA | Linear autoregressive and moving-average dynamics; differencing is optional | `SARIMAX(order=(1,0,1), seasonal_order=(1,0,0,7), trend="c")` | Interpretable classical baseline; order selection and stationarity assumptions matter |
-| Exponential smoothing | Recursively update level, trend and seasonal components, favoring recent observations | Additive damped trend + additive weekly seasonality | Fast and useful for smooth evolving seasonal patterns; unusual events remain difficult |
-| Prophet (bonus) | Additive trend plus Fourier seasonalities and optional holiday/regressor terms | Weekly on; daily/yearly off | Convenient calendar model; Stan dependency and tuning overhead make it optional |
+| Seasonal naive | Repeats the last full season | `NaiveForecaster(strategy="last", sp=7)` | Almost no setup. Strong when weeks repeat. Cannot see new trends or special days |
+| ARIMA/SARIMA | Predicts from recent values and recent errors; the series can be differenced | `SARIMAX(order=(1,0,1), seasonal_order=(1,0,0,7), trend="c")` | A clear classical baseline. You have to choose the orders, and the series needs to behave in a steady way (stationarity) |
+| Exponential smoothing (ETS) | Keeps updating a level, a trend and a seasonal pattern, and gives recent days more weight | Damped additive trend + additive weekly pattern | Fast, and good for smooth, slowly changing patterns. Unusual events stay hard |
+| Prophet (bonus) | A trend plus smooth seasonal curves, with optional holiday and extra-variable terms | Weekly on; daily and yearly off | Convenient for calendar patterns. Needs Stan and tuning, so it is optional |
 
-ARIMA's "I" means integrated/differenced; our fixed example uses `d=0,D=0`.
-It is still in the ARIMA family. We deliberately avoid an expensive automatic
-search. The sktime `SARIMAX` wrapper uses statsmodels and avoids an additional
-pmdarima dependency. The experiment is not a comparison against the best
-possible tuned classical model.
+The "I" in ARIMA means *integrated*: the series is differenced. Our fixed
+example uses `d=0,D=0`, so nothing is differenced, and it is still an ARIMA
+model. We do not run an expensive automatic search for the best settings. The
+sktime `SARIMAX` wrapper uses statsmodels, so we do not need the extra pmdarima
+package. This experiment does not compare against the best possible tuned
+classical model.
 
-Prophet supports additional regressors, but they need suitable future values.
-Observed future weather is not a legitimate known-future regressor. Calendar
-features genuinely known at the origin are different.
+Prophet accepts extra variables, but you need real values for them over the
+forecast period. Observed future weather is not available at the cutoff, so it
+cannot be used. Calendar features that are known in advance are fine.
 
 Sources: [sktime naive](https://www.sktime.net/en/stable/api_reference/auto_generated/sktime.forecasting.naive.NaiveForecaster.html),
 [statsmodels SARIMAX](https://www.statsmodels.org/stable/generated/statsmodels.tsa.statespace.sarimax.SARIMAX.html),
@@ -79,38 +83,38 @@ For more background: [Forecasting: Principles and Practice](https://otexts.com/f
 ## 4. Chronos-2
 
 **Developer:** Amazon. **Workshop checkpoint:** `amazon/chronos-2`, 120M
-parameters. Do not confuse it with original Chronos-T5 or Chronos-Bolt.
+parameters. Do not mix it up with the original Chronos-T5 or Chronos-Bolt.
 
-### Architecture and predictions
+### How it works and what it predicts
 
-Chronos-2 is a **patch-based, encoder-only transformer**. It combines temporal
-modeling with a group-attention mechanism that allows related targets and
-covariates to interact. It supports univariate, multivariate, and
-covariate-informed forecasting in one pretrained model, and natively produces
-quantile forecasts. The published default context is up to 8192 observations.
-That maximum is not a recommendation to use all of it for every task.
+Chronos-2 is a **patch-based, encoder-only transformer**. It combines attention
+over time with group attention, which lets related series and extra variables
+influence each other. One pretrained model handles a single series, several
+series, and series with covariates, and it returns quantile forecasts natively.
+The published default context is up to 8192 observations. That is a maximum,
+not a recommendation to always use all of it.
 
-Original Chronos scaled and quantized numeric values into discrete tokens
-and used language-model-style training and sampled forecast paths.
-Chronos-Bolt moved to patching and direct multi-step quantiles.
-Describing Chronos-2 simply as "T5 predicting discretized numbers" would
-conflate different generations.
+The original Chronos scaled the values and turned them into discrete tokens,
+like a language model, and sampled forecast paths. Chronos-Bolt switched to
+patches and predicts several steps directly, with quantiles. Calling Chronos-2
+"T5 predicting discretized numbers" mixes up different generations.
 
-### Native capabilities versus our wrapper
+### What the model can do, and what our wrapper does
 
-Native Chronos-2 handles multiple target variables, past-only covariates and
-known-future covariates. Cross-learning across series is an additional option,
-not automatically equivalent to joint forecasting every unrelated series.
+The Chronos-2 model natively handles several target series, covariates seen
+only in the past, and covariates known for the future. Learning across several
+series is an extra option. It is not the same as forecasting every unrelated
+series together.
 
-The sktime 1.3.0 `Chronos2Forecaster` exposes multivariate and exogenous support,
-but advertises **no prediction-interval capability** and **no missing-value
-capability**. Therefore our notebook asks it only for complete-data point
-forecasts. Do not infer that `predict_interval` works just because the
-underlying model has quantiles.
+The sktime 1.3.0 `Chronos2Forecaster` supports several series and extra
+variables (`X`). It does **not** support prediction intervals or missing
+values. So our notebook only asks it for point forecasts on complete data. Do
+not assume `predict_interval` works just because the model itself produces
+quantiles.
 
-The notebook uses an explicit 168-day context, batch size 1, and float32
-for simplicity. A native default may choose another dtype. Optimizing
-precision and batch size is not a beginner exercise.
+The notebook uses a 168-day context, batch size 1 and float32, to keep things
+simple. A native default may use another data type. Tuning precision and batch
+size is not a beginner exercise.
 
 **Start and sources**
 
@@ -135,38 +139,39 @@ https://github.com/sktime/sktime/blob/v1.3.0/sktime/forecasting/chronos2.py
 ## 5. TimesFM 2.5
 
 **Developer:** Google Research. **Workshop checkpoint:**
-`google/timesfm-2.5-200m-transformers`. The 2.5 base has 200M parameters;
-upstream describes an optional approximately 30M continuous-quantile head.
-The checkpoint packaging and quantile-head configuration matter.
+`google/timesfm-2.5-200m-transformers`. The 2.5 base model has 200M parameters.
+The upstream project also describes an optional quantile head of about 30M
+parameters. How the checkpoint is packaged, and whether the quantile head is
+on, both matter.
 
-### Architecture and predictions
+### How it works and what it predicts
 
-TimesFM is a **decoder-only, patched time-series transformer** trained for
-forecasting. TimesFM 2.5 reduces the base parameter count relative to 2.0
-(200M versus 500M) while extending supported context to 16k observations.
-It drops the earlier explicit frequency indicator. Its optional continuous
-quantile head supports horizons up to about 1k observations; do not interpret
-that as an unlimited long-horizon guarantee.
+TimesFM is a **decoder-only, patched transformer** built for forecasting.
+TimesFM 2.5 has fewer base parameters than 2.0 (200M instead of 500M) and a
+longer context (up to 16k observations). It no longer needs the frequency
+indicator that earlier versions had. Its optional quantile head supports
+horizons of about 1k observations. That does not mean it can forecast any
+horizon reliably.
 
-The foundational TimesFM paper describes the decoder-only family, not every
-implementation detail added in 2.5. Cite the official 2.5 release notes as well.
+The original TimesFM paper describes the decoder-only family, not every detail
+added in 2.5. Cite the official 2.5 release notes as well.
 
-### Covariates and wrapper limits
+### Extra variables and wrapper limits
 
-The native TimesFM 2.5 library has **XReg** support: an external regression
-mechanism for covariates. That is not the same as native cross-variate
-attention in a joint multivariate model.
+The native TimesFM 2.5 library supports covariates through **XReg**, an
+external regression step. That is not the same as the cross-variable attention
+in a joint multivariate model.
 
-Our `TimesFM2Forecaster` uses Hugging Face transformers, supports point and
-quantile predictions, and advertises **no exogenous support** in sktime 1.3.0.
-Passing `X` is not a way to activate native-library XReg here.
-Forecasting columns independently is also not evidence of learned cross-series
-interactions. We use a single target so the distinction stays manageable.
+Our `TimesFM2Forecaster` uses Hugging Face transformers. It returns point
+forecasts and quantiles. In sktime 1.3.0 it has **no support for extra
+variables**, so passing `X` does not switch on the native XReg. Forecasting
+several columns one by one is also not evidence that the model learned how the
+series affect each other. We use one target series to keep this simple.
 
-The adapter can support both 2.0 and 2.5 checkpoint families. Its broad
-transformers dependency minimum is insufficient to guarantee that the 2.5
-class exists; the code specifically checks newer transformers support.
-Our pins avoid relying on an old Colab transformers install.
+The adapter works with both the 2.0 and the 2.5 checkpoint families. Its
+minimum transformers version is too broad to guarantee that the 2.5 class
+exists, so the code checks for a newer transformers version. Our pinned
+versions mean we do not rely on the old transformers that Colab ships with.
 
 **Start and sources**
 
@@ -185,58 +190,56 @@ https://arxiv.org/abs/2310.10688
 Pinned wrapper:
 https://github.com/sktime/sktime/blob/v1.3.0/sktime/forecasting/timesfm2.py
 
-**Version warning:** TimesFM 3.0 now exists and adds native multivariate and
-covariate functionality. We intentionally retain 2.5. Do not silently upgrade:
-capabilities and licenses differ. The official repository says weights up to
-2.5 remain Apache-2.0, whereas 3.0 downloaded weights have a separate
-non-commercial license. Review current terms for your deployment.
+**Version warning:** TimesFM 3.0 now exists. It adds native multivariate and
+covariate support. We deliberately stay on 2.5. Do not upgrade without
+checking: features and licenses differ. The official repository says weights up
+to 2.5 stay Apache-2.0, while the downloaded 3.0 weights have a separate
+non-commercial license. Check the current terms for your own use.
 
 ## 6. t0-gamma
 
 **Developer:** The Forecasting Company. **Checkpoint:**
-`theforecastingcompany/t0-gamma`; approximately 256M parameters.
-This is not t0-alpha (approximately 102M). Use `tfc-t0[torch]>=0.6.0`;
-earlier releases do not read all gamma configuration conventions.
+`theforecastingcompany/t0-gamma`, about 256M parameters. This is not t0-alpha
+(about 102M). Use `tfc-t0[torch]>=0.6.0`; earlier releases do not read all the
+gamma settings.
 
-### Architecture and predictions
+### How it works and what it predicts
 
-t0 is a **decoder-style patch transformer alternating time and covariate
-attention**. The current gamma description gives 24 layers, embedding
-dimension 1024, 8 attention heads, and patch size 32. It decodes multiple
-horizons in parallel, up to 1024 steps in one forward pass, with
-autoregressive rollout beyond that.
+t0 is a **decoder-style patch transformer that alternates time attention and
+covariate attention**. The gamma description lists 24 layers, an embedding size
+of 1024, 8 attention heads and a patch size of 32. It predicts many steps ahead
+in parallel, up to 1024 steps in one pass, and continues step by step beyond
+that.
 
-Gamma has 21 trained quantile levels spanning 0.01–0.99. The native
-implementation interpolates between trained quantiles and uses exponential
-tails beyond them. More extreme quantiles therefore deserve particular
-scrutiny rather than automatic confidence.
+Gamma has 21 trained quantile levels from 0.01 to 0.99. The native code
+interpolates between them and uses exponential tails beyond them. So treat very
+extreme quantiles with extra care.
 
-Native t0 supports historical multivariate context and known-future
-covariates, variable-length batching, and missing observations. Current native
-inference also offers history-based options such as nonnegative clipping,
-integer snapping, and symmetric averaging. These options change the
-experiment; we do not claim to use them through an adapter that does not
-expose them.
+Native t0 supports multivariate history, covariates known for the future,
+batches of different lengths and missing values. Current native inference also
+offers options based on the history, such as clipping to nonnegative values,
+rounding to integers and symmetric averaging. These options change the
+experiment. We do not claim to use them through an adapter that does not offer
+them.
 
-### What sktime actually exposes
+### What sktime offers
 
-`T0Forecaster` defaults to **alpha**, so the factory explicitly selects gamma.
-The adapter's point prediction is the median. It provides quantile and
-interval methods, and supports missing values and known-future exogenous
-inputs. For `X`, provide historical and future values with complete horizon
-coverage.
+`T0Forecaster` defaults to **alpha**, so our factory picks gamma explicitly.
+The adapter's point forecast is the median. It has quantile and interval
+methods, and it supports missing values and covariates known for the future.
+For `X`, give it values for the history and for the whole forecast horizon.
 
-Crucially, its multi-column target handling forecasts columns **independently**.
-The multivariate capability tag does not imply the wrapper exposes the native
-model's full joint multivariate attention. Our univariate exercise avoids
-pretending to test that capability.
+With several target columns it forecasts each column **on its own**. The
+multivariate tag does not mean the wrapper offers the native model's joint
+multivariate attention. Our single-series exercise does not pretend to test
+that.
 
-The wrapper requires `license_accepted=True`. Its text still describes older
-gated access, while the current official tfc-t0 README says alpha, beta, and
-gamma are public and download without authentication and identifies
-Apache-2.0 licensing. We keep explicit acceptance, do not demand a token by
-default, and direct participants to check the current terms. A wrapper's
-outdated access text is not evidence that a model is currently gated.
+The wrapper needs `license_accepted=True`. Its text still describes the older
+gated access, while the current official tfc-t0 README says alpha, beta and
+gamma are public, download without login and are Apache-2.0. We keep the
+explicit acceptance, do not ask for a token by default, and tell participants
+to check the current terms. Outdated access text in a wrapper does not show
+that a model is gated today.
 
 **Start and sources**
 
@@ -255,71 +258,73 @@ https://arxiv.org/abs/2609.24559
 Pinned wrapper:
 https://github.com/sktime/sktime/blob/v1.3.0/sktime/forecasting/t0.py
 
-## 7. Practical comparison at a glance
+## 7. The three models at a glance
 
-This table is **version- and interface-specific**, not a universal feature
-ranking. Native capabilities do not automatically flow through every wrapper.
+This table is specific to these versions and interfaces. It is not a ranking of
+features. What a model can do natively does not automatically carry over into
+every wrapper.
 
 | Property | Chronos-2 | TimesFM 2.5 | t0-gamma |
 |---|---|---|---|
-| Architecture | Encoder-only patched transformer, time/group attention | Decoder-only patched transformer | Decoder-style patch transformer, time/covariate attention |
-| Approximate base size | 120M | 200M; optional quantile head adds parameters | 256M |
-| Native probabilistic output | Quantiles | Quantiles with appropriate head/configuration | Quantiles, including median |
-| Native cross-variable/context support | Joint multivariate targets and covariates | XReg covariates; distinguish from joint multivariate attention | Multivariate historical context and known-future covariates |
-| sktime interval interface here | No | Yes | Yes |
-| sktime exogenous interface here | Yes | No | Yes, with required history/future coverage |
-| Important wrapper caveat | Native quantiles not exposed as intervals | Use the transformers 2.5 checkpoint; no XReg through this adapter | Defaults to alpha; multi-column y processed independently |
-| Live classroom plan | One assigned model or saved results | One assigned model or saved results | One assigned model or saved results, license terms apply |
+| Architecture | Encoder-only patch transformer; time and group attention | Decoder-only patch transformer | Decoder-style patch transformer; time and covariate attention |
+| Approximate base size | 120M | 200M; the optional quantile head adds more | 256M |
+| Native probabilistic output | Quantiles | Quantiles, with the right head and configuration | Quantiles, including the median |
+| Native multi-variable and covariate support | Joint multivariate targets and covariates | XReg covariates (not the same as joint multivariate attention) | Multivariate history and covariates known for the future |
+| sktime intervals here | No | Yes | Yes |
+| sktime extra variables here | Yes | No | Yes, with values for the history and the whole forecast horizon |
+| Main wrapper caveat | Native quantiles are not offered as intervals | Use the transformers 2.5 checkpoint; no XReg through this adapter | Defaults to alpha; several target columns are processed independently |
+| In the workshop | Your chosen model, run live or from saved results | Your chosen model, run live or from saved results | Your chosen model, run live or from saved results; license terms apply |
 
-CPU execution can be possible for these libraries, but "possible" and
-"comfortable for every learner in 90 minutes" are different requirements.
-Actual speed depends on hardware, precision, context length, package versions,
-and cold versus warm loading. The experiment supplies identical raw context;
-each architecture has different internal patching and scaling.
+A CPU can run these libraries, but "can run" and "runs comfortably for every
+participant within 90 minutes" are different things. Speed depends on the
+hardware, the precision, the context length, the package versions, and whether
+the model is loaded for the first time or already cached. All models get the
+same raw history. Each architecture patches and scales it differently inside.
 
-## 8. Kumo Forecast: tutorial-only extension
+## 8. Kumo Forecast: not in the workshop notebooks
 
-**NVIDIA Kumo-Forecast**, part of **Kumo-TS** (formerly NV-Tesseract), is a
-time-series model/library. It should not be confused with Kumo Relational.
+**NVIDIA Kumo-Forecast** is part of **Kumo-TS** (formerly NV-Tesseract). It is a
+time-series model and library. Do not confuse it with Kumo Relational.
 
-The inspected implementation uses a patched **T5-encoder/MOMENT-style
-backbone** with a forecasting head; the model builder references
-`AutonLab/MOMENT-1-large`. The SDK supports multivariate inputs and optional
-cross-channel attention configurations. The published forecast checkpoint
-uses a typical 512-step context and native 72-step prediction window; longer
-horizons use repeated rollout. Those settings are checkpoint-specific.
+The implementation we looked at uses a patched **T5-encoder / MOMENT-style
+backbone** with a forecasting head. The model builder refers to
+`AutonLab/MOMENT-1-large`. The SDK supports multivariate input and optional
+cross-channel attention. The published forecast checkpoint typically uses a
+512-step context and predicts 72 steps natively. Longer horizons repeat the
+forecast step by step. These settings belong to that checkpoint.
 
-An additional **DARR** mode blends direct predictions with retrieved
-nearest-neighbor historical continuations. The choice of context memory is
-part of the forecasting system. A fair backtest must restrict that memory to
-information available at each origin, including the retrieved continuation.
-Retrieving examples whose continuations contain the test future would leak.
+An extra **DARR** mode combines direct predictions with similar stretches of
+past history that are retrieved (nearest neighbors), together with what
+followed them. What you allow it to retrieve is part of the forecasting system.
+In a fair backtest the retrieval memory may only hold what was known at each
+cutoff, including the retrieved continuations. If a retrieved example continues
+into the test days, that is leakage.
 
-The SDK offers preprocessing, optional fine-tuning and interpretability
-tools, as well as direct and hybrid point forecasts. Do not assume that
-interpretability outputs are calibrated uncertainty intervals. Review
-missing-data handling and standardizer provenance before using it on your data.
+The SDK also has preprocessing, optional fine-tuning and interpretability tools,
+plus direct and hybrid point forecasts. Do not assume the interpretability
+output is a calibrated uncertainty interval. Check how it handles missing data
+and where its standardizer comes from before you use it on your own data.
 
 ### Why it is not in the live notebooks
 
-**It is not strictly NVIDIA-GPU-only.** Current Kumo-TS documentation describes
-CUDA/MPS use and CPU fallback; its forecasting requirements recommend a GPU
-but permit CPU. NVIDIA's separate Structured Data Models route is GPU-native.
-These are different installation routes and should not be conflated.
+**It does not strictly need an NVIDIA GPU.** The current Kumo-TS documentation
+describes CUDA and MPS use and a CPU fallback. Its forecasting requirements
+recommend a GPU but allow a CPU. NVIDIA's separate Structured Data Models route
+is built for GPUs. These are different ways to install it, so do not mix them up.
 
-The upstream forecasting guide recommends substantial disk capacity, and
-states that combined DARR/interpretability examples can use far more memory
-than baseline forecasting. Repository setup, extra assets, modes, and runtime
-requirements make it a poor additional dependency for this 90-minute session.
-Exclusion is a scope/reliability choice, not a claim that CPU is impossible.
+The upstream forecasting guide recommends a lot of disk space, and says that
+DARR combined with interpretability can need far more memory than basic
+forecasting. The setup, the extra files, the modes and the runtime needs make it
+a poor extra dependency for a 90-minute session. We left it out to keep the
+session small and reliable. We are not saying it cannot run on a CPU.
 
 ### Getting started after the workshop
 
-Use a separate environment and follow the official Kumo-Forecast guide.
-Start with its basic DataFrame forecast and leave DARR, interpretability,
-and fine-tuning off. Inspect the output schema and map it back to the exact
-dates in this workshop before attempting the same three-fold protocol.
-The official quickstart uses:
+Use a separate environment and follow the official Kumo-Forecast guide. Start
+with the basic DataFrame forecast and leave DARR, interpretability and
+fine-tuning off. Look at the format of the output and match it to the exact
+dates in this workshop before you try the same three-fold backtest. The
+official quickstart uses:
 
 ```python
 # Tutorial only: requires the separately installed Kumo-Forecast environment.
@@ -330,12 +335,12 @@ config = ForecastingConfig(
     target_column="target",
     forecast_horizon=14,
 )
-# training_frame must contain ONLY history available at the forecast origin.
+# training_frame must contain ONLY history available at the forecast cutoff.
 result = perform_forecasting(df=training_frame, config=config)
 ```
 
-This is a sketch of the official entry point, not a runnable workshop cell
-or a validated drop-in sktime estimator.
+This is a sketch of the official entry point. It is not a runnable workshop
+cell, and not a tested drop-in sktime model.
 
 Official project:
 https://github.com/NVIDIA/Kumo-TS
@@ -361,37 +366,38 @@ paper for Kumo-Forecast.
 
 ## 9. Kumo Relational and the wider family
 
-**Kumo Relational** predicts from related tables rather than just a regularly
-sampled vector. Example: from customers, orders, and products, predict which
-customers will purchase in the next 30 days. Keys connect rows into a graph.
-The entity, prediction timestamp, query, and relational context define the task.
+**Kumo Relational** predicts from related tables, not just from a regularly
+sampled series. Example: from tables of customers, orders and products, predict
+which customers will buy in the next 30 days. Keys link the rows into a graph.
+The task is defined by the entity, the prediction time, the query and the
+relational context.
 
-The inspected NVIDIA `KumoRelational` implementation describes three stages:
-**row embeddings within tables**, **schema-agnostic GNN message passing
-between related rows**, and **dataset-level in-context learning** over labeled
-context examples and query examples. Its source calls it an adaptation of
-KumoRFM-2 and uses TabICLv2-style embedding/ICL components. This is a
-different architecture and data problem from a univariate patch forecaster.
-It can produce classification logits or regression quantiles in that interface.
+The NVIDIA `KumoRelational` implementation we looked at has three stages:
+**row embeddings inside each table**, **message passing between related rows
+with a graph neural network (GNN) that works on any schema**, and
+**in-context learning over the whole dataset**, using labeled context examples
+and query examples. Its source calls it an adaptation of KumoRFM-2 and uses
+TabICLv2-style embedding and in-context-learning parts. This is a different
+architecture and a different data problem from a single-series patch
+forecaster. In that interface it can return classification logits or
+regression quantiles.
 
-The `kumo-relational-client` library calls a **NIM inference endpoint**.
-The client itself downloads no model weights and requires no local GPU;
-the serving endpoint owns inference hardware. Hosted endpoints can require
-accounts/API keys and transmit supplied data; self-hosting has its own GPU,
-deployment, and licensing requirements. Do not send private relational data
-to a service merely to try a workshop example.
+The `kumo-relational-client` library calls a **NIM inference endpoint**. The
+client downloads no model weights and needs no local GPU: the server running
+the endpoint provides the hardware. Hosted endpoints can need an account or an
+API key, and they receive the data you send. Self-hosting has its own GPU,
+deployment and license requirements. Do not send private relational data to a
+service just to try a workshop example.
 
-Keep separate:
-**Kumo Engine** is infrastructure for relational context generation and can
-train a GNN on your data; **Kumo Relational** is a pretrained model.
-Neither is simply an alternate name for Kumo Forecast.
+Keep these apart: **Kumo Engine** is infrastructure that builds relational
+context and can train a GNN on your data. **Kumo Relational** is a pretrained
+model. Neither is another name for Kumo Forecast.
 
-The current NVIDIA family also includes **Kumo Tabular** for tables and
-**Kumo Anomaly** for time-series anomaly detection. More broadly, there are
-other forecasting foundation models—Moirai, Toto, TiRex, Chronos-Bolt, and
-newer TimesFM generations among them. Their tasks, covariate support, licenses,
-and adaptation interfaces differ. A longer model list is not necessarily
-a better workshop.
+The NVIDIA family also includes **Kumo Tabular** for tables and **Kumo Anomaly**
+for finding anomalies in time series. Beyond that, there are other forecasting
+foundation models, for example Moirai, Toto, TiRex, Chronos-Bolt and newer
+TimesFM versions. Their tasks, covariate support, licenses and ways of adapting
+them differ. A longer list of models does not make a better workshop.
 
 Official relational client and endpoint instructions:
 https://github.com/kumo-ai/kumo-relational-client
@@ -413,28 +419,28 @@ https://github.com/NVIDIA/kumo-engine
 
 ### Timestral (Mistral AI): mentioned, not used
 
-Mistral AI's **Timestral** is a family of pretrained forecasting models
-(5M, 28M, 123M, and 209M parameters). It is a patch-based transformer with
-time and variate attention, up to 32,768 steps of context, 21 quantile outputs,
-and support for past-only and known-future covariates. Mistral reports
-state-of-the-art zero-shot results on GIFT-Eval, TIME, and fev-bench; those are
-vendor claims, not our benchmark, and its tech report is listed as
-"coming soon".
+Mistral AI's **Timestral** is a family of pretrained forecasting models with
+5M, 28M, 123M and 209M parameters. It is a patch-based transformer with time
+and variate attention. It reads up to 32,768 steps of context, returns 21
+quantiles, and supports covariates seen only in the past and covariates known
+for the future. Mistral reports state-of-the-art zero-shot results on
+GIFT-Eval, TIME and fev-bench. These are the vendor's claims, not our
+benchmark, and the tech report is listed as "coming soon".
 
 **Many of us may not be allowed to use it, possibly including the workshop
-instructor.** It is released under a "Modified MIT" license that says you are
-not authorized to exercise any rights under it if the global consolidated
-monthly revenue of your company, or of your employer, exceeded $20 million in
-the preceding month. The cutoff is on the company's size, not on whether your
-use is commercial, so it can apply to employees doing personal or learning
-work. Read the license yourself and ask your legal team before using it.
-Larger companies are directed to Mistral for a commercial license or its
-hosted service.
+instructor.** It has a "Modified MIT" license. Under it, you are not allowed to
+use any of the rights if the global consolidated monthly revenue of your
+company, or of your employer, was above $20 million in the previous month. The
+limit depends on the size of the company, not on whether your use is
+commercial. So it can apply to employees who use it for personal or learning
+purposes. Read the license yourself and ask your legal team before you use it.
+Larger companies are sent to Mistral for a commercial license or its hosted
+service.
 
-**It is also not in sktime yet.** sktime 1.3.0, the version used here, has no
-Timestral wrapper, so it cannot go through our shared `evaluate` benchmark.
-A wrapper has been proposed (issue #11568, pull request #11569, both open when
-this was written); check their status for current availability. For these two
+**It is also not in sktime yet.** sktime 1.3.0, the version we use, has no
+Timestral wrapper, so it cannot go through our shared `evaluate` benchmark. A
+wrapper has been proposed (issue #11568, pull request #11569, both open when
+this was written). Check their status for what is available now. For these two
 reasons we neither run nor teach it in the workshop.
 
 Model card: https://huggingface.co/mistralai/Timestral-209M
@@ -448,50 +454,89 @@ Code: https://github.com/mistralai/timestral/
 sktime proposal: https://github.com/sktime/sktime/issues/11568 and
 https://github.com/sktime/sktime/pull/11569
 
-## 10. Fair evaluation and honest conclusions
+## 10. Fair evaluation and what to conclude
 
-Use **temporal**, not random, splits. Any scaling, imputation, parameter
-selection, feature construction, or retrieval memory must respect the
-forecast origin. Do not use actual future covariates where only a forecast
-would have been available in practice.
+Use **time-based** splits, never random ones. Scaling, filling gaps, choosing
+parameters, building features and any retrieval memory must only use what was
+known at the cutoff. Do not use actual future values of a covariate when, in
+real life, you would only have had a forecast of it.
 
-The notebooks use **rolling context** (fixed 168 days), not expanding context.
-All three 14-day test windows are non-overlapping. `evaluate` uses refit
-strategy; metrics are calculated on every horizon point. We average fold
-MAE and fold-specific seasonal MASE, inspect each fold, and show forecasts.
+The notebook uses a **rolling context** (a fixed 168 days), not a growing one.
+The three 14-day test windows do not overlap. `evaluate` uses the `refit`
+strategy: the model is fitted again in every fold. Metrics are computed on
+every day of the horizon. We average the MAE of the folds and the
+fold-specific seasonal MASE, look at each fold, and plot the forecasts.
+Section 3.2 of the notebook compares MAE, RMSE, MAPE, WAPE and MASE.
 
-For fold training values `y[0], ..., y[n-1]`, the MASE denominator is:
+For the training values `y[0], ..., y[n-1]` of a fold, the MASE denominator is:
 
 ```text
 scale = mean(abs(y[t] - y[t-7])) for t = 7,...,n-1
 MASE = test_MAE / scale
 ```
 
-MASE below one compares with an **in-sample seasonal-difference scale**, not
-with the realized seasonal-naive test forecast. For a direct test comparison:
+A MASE below 1 compares with the **seasonal-difference scale on the training
+data**, not with the seasonal-naive forecast on the test days. For a direct
+comparison on the test days:
 
 ```text
 improvement (%) = 100 * (1 - model_test_MAE / seasonal_naive_test_MAE)
 ```
 
-Constant series can have zero MASE scale; a production benchmark needs an
-explicit policy, not silent infinities. Our dataset has nonzero scales.
-Equal-length folds make mean MAE directly comparable, but different hardware
-and cache states make timing comparisons approximate.
+A constant series has a MASE scale of zero. A real benchmark needs a clear rule
+for that, not silent infinities. Our data has nonzero scales. Folds of equal
+length make the mean MAE directly comparable. Timings differ with hardware and
+cache state, so treat them as rough.
 
-Probabilistic evaluation is a useful extension: pinball loss, interval
-coverage, and interval width ask different questions than point MAE.
-An 80% interval should cover roughly 80% of relevant future outcomes over
-many suitable cases; it is neither a guarantee on one point nor necessarily
-a simultaneous interval for a whole forecast path.
+Evaluating probabilistic forecasts is a useful extension: pinball loss,
+interval coverage and interval width answer different questions than the point
+MAE. An 80% interval should cover about 80% of the actual values over many
+suitable cases. It is not a guarantee for a single point, and not necessarily
+an interval for the whole forecast path at once.
 
-Do not call a point-forecast MAE winner "best at uncertainty". Do not call
-three folds a significance study. Do not tune on these folds and then report
-the improved score as an untouched final test. And do not rank a failed
-model as zero error: **not evaluated** is a meaningful status.
+What not to claim:
 
-The final question is a decision: **is the improvement, if any, worth the
-runtime, dependencies, operational burden, and uncertainty for this use case?**
+- Do not call the model with the lowest point-forecast MAE "best at
+  uncertainty".
+- Do not call three folds a significance test.
+- Do not tune on these folds and then report the better score as a clean final
+  test.
+- Do not rank a model that failed as having zero error. **Not evaluated** is a
+  valid result.
+
+The final question is a decision: **is the improvement, if any, worth the run
+time, the dependencies, the effort to operate it and the uncertainty, for your
+use case?**
+
+### Extra variables (covariates) to try next
+
+The workshop data has only the date and the number of births. The original
+FiveThirtyEight file adds nothing more: year, month, day of month and weekday
+are all calendar fields that we can compute from the date.
+
+An extra variable only helps if you **know its value in advance**, for the whole
+forecast horizon. Ideas:
+
+- **Weekday, month, day of month.** Computed from the date. The weekly pattern
+  is already in the seasonal models, but an explicit weekday column is the
+  simplest first try.
+- **Public holidays.** The best idea for this data. pandas has
+  `pandas.tseries.holiday.USFederalHolidayCalendar`, so nothing needs to be
+  downloaded. Two holidays fall in our test days: Thanksgiving (27 November
+  2014, fold 1) and Christmas Day (25 December 2014, fold 3). Births were about
+  7,400 and 6,700 on those days, against about 12,500 and 12,800 on the same
+  weekday a week earlier. Every model in our backtest over-forecast them by
+  4,400 to 5,700. Add a holiday flag, and maybe "day before" and "day after"
+  flags: 24 and 26 December were low too.
+- **Long weekends and bridge days**, for example when July 4 falls on a Friday.
+
+Not allowed: weather, or any other series, observed during the forecast period.
+At the cutoff you would only have a forecast of it.
+
+In our setup, ARIMA (`SARIMAX`), Chronos-2 and t0-gamma accept extra variables.
+Seasonal naive, ETS and the TimesFM 2.5 adapter do not. For a fair comparison,
+give every model that can use them the same information, and say clearly which
+models could not.
 
 Evaluation sources:
 https://www.sktime.net/en/stable/api_reference/auto_generated/sktime.forecasting.model_evaluation.evaluate.html

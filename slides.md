@@ -51,9 +51,9 @@ Use green/yellow/red help signals; no public speed leaderboard. -->
 
 # Today's route
 
-**Notebook 1:** see a pattern → split time → forecast → plot
+**Parts 1–2:** look at the data → split time → forecast → plot
 
-**Notebook 2:** backtest → compare → explain a decision
+**Part 3:** backtest → compare → write a recommendation
 
 RUN THIS = prewritten  
 YOUR TURN = your code, with hints and solutions
@@ -85,18 +85,18 @@ fixed: daily aggregate U.S. births, not individual medical predictions. -->
 420 days of aggregate U.S. births  
 Daily frequency; a possible **7-day seasonal cycle**
 
-We reserve the last **42 days** before exploration.
+We set aside the last **42 days** before we explore.
 
 Why not weekly? Aggregation would erase the weekday pattern.
 
-<!-- 0:07–0:12. Notebook 1 data plot and weekday exercise.
+<!-- 0:07–0:12. Part 1: data plot and weekday exercise.
 Attribution: FiveThirtyEight / SSA, CC BY 4.0; full provenance in data/README.md.
 Ask what might explain weekends. Distinguish description from causation.
 Do not project the final evaluation period yet. -->
 
 ---
 
-# YOUR TURN: build a time machine
+# YOUR TURN: split past and future
 
 ```text
 168 days we know | 14 days we predict
@@ -107,15 +107,15 @@ Do not project the final evaluation period yet. -->
 **Context:** observed history  
 **Horizon:** days 1 through 14
 
-Random splitting would break the task.
+A random split would leak the future into training.
 
-<!-- 0:12–0:22. Notebook 1 split exercise. Give 3–4 minutes of quiet work.
+<!-- 0:12–0:22. Part 2.1 split exercise. Give 3–4 minutes of quiet work.
 Ask why horizon zero is wrong. The demo is within development; the final
-42 days remain reserved for notebook 2. -->
+42 days remain reserved for Part 3. -->
 
 ---
 
-# Meet the model to beat
+# A simple baseline to beat
 
 ## Seasonal naive
 
@@ -164,13 +164,13 @@ certify unseen data. Avoid claims about universality or "understanding time". --
 
 ---
 
-# Three architectures, one interface
+# Three models, one interface
 
-| Model | Core idea |
+| Model | What it does |
 |---|---|
-| Chronos-2 | Patched encoder + time/group attention |
-| TimesFM 2.5 | Patched decoder-only transformer |
-| t0-gamma | Patch transformer + time/covariate attention |
+| Chronos-2 | Predicts the next 14 days directly from the history |
+| TimesFM 2.5 | Writes the forecast one block of days after another |
+| t0-gamma | Predicts many days ahead in parallel |
 
 **Native capability ≠ wrapper capability**
 
@@ -185,7 +185,7 @@ t0's multi-column wrapper processes columns independently. -->
 
 # RUN THIS: one foundation forecast
 
-Choose one prepared model.
+Choose one model.
 
 **Live inference** or **saved real inference**—label which.
 
@@ -193,17 +193,17 @@ Compare its curve with actuals and seasonal naive.
 
 If a model failed: **not evaluated**, not "zero error".
 
-<!-- 0:38–0:45. Notebook 1 model cell and reflection.
+<!-- 0:38–0:45. Part 2.3: model cell and reflection.
 If no actual foundation results were produced in rehearsal, say the evidence
 is unavailable. Never present a synthetic curve as model output.
 Do not spend more than two minutes troubleshooting a live download.
-At minute 45, driver/navigator swap and open notebook 2. -->
+At minute 45, swap driver and navigator: Part 3 starts. -->
 
 ---
 
 # One lucky split is not enough
 
-## Backtest three forecast origins
+## Backtest: three folds, three cutoffs
 
 168-day context → 14-day forecast  
 Move forward 14 days → repeat  
@@ -211,7 +211,7 @@ Move forward 14 days → repeat
 
 Earlier test outcomes can become **later history**.
 
-<!-- 0:45–0:53. Notebook 2 splitter exercise and schedule table.
+<!-- 0:45–0:53. Part 3.1: splitter exercise and schedule table.
 No overlap in test windows. Fixed-length rolling context, not expanding.
 Ask why using the first test window in a later training window is valid. -->
 
@@ -222,6 +222,8 @@ Ask why using the first test window in a later training window is valid. -->
 **MAE:** typical absolute error, in original units
 
 **Seasonal MASE:** MAE divided by a training-only seasonal scale
+
+The notebook also lists RMSE, MAPE and WAPE, with formulas.
 
 MASE < 1 does **not** prove a test-set win over seasonal naive.
 
@@ -234,7 +236,7 @@ Use the notebook formula rather than a long derivation. -->
 
 ---
 
-# Same track for every contestant
+# Same track for every candidate
 
 Seasonal naive · SARIMA · Exponential smoothing
 
@@ -247,16 +249,17 @@ Prophet is an optional extra, not an installation hurdle.
 
 <!-- 0:57–1:05. Run baseline benchmark and load real instructor artifacts.
 Assign models across tables rather than every person running every model.
-Explain refit: classical parameters change; zero-shot weights do not.
+Explain refit: every model is fitted again in each fold. ARIMA and ETS
+estimate new numbers; the foundation models only read the new history.
 Runtime includes different cold/warm effects—do not overinterpret timings. -->
 
 ---
 
-# YOUR TURN: trust, but inspect
+# YOUR TURN: build the leaderboard
 
-Build the leaderboard.
+Rank the candidates by mean MAE.
 
-Does the winner change by fold?  
+Is the same model best in every fold?  
 Where is the largest miss?  
 Is a small improvement worth more setup and runtime?
 
@@ -264,15 +267,16 @@ Is a small improvement worth more setup and runtime?
 
 <!-- 1:05–1:17. Leaderboard exercise, per-fold bars, actual forecast graph.
 Ask each pair for one observation, not just the winning model name.
-The late-year windows include calendar effects: don't secretly add future
-features to just one contestant after seeing the errors. -->
+Thanksgiving and Christmas fall in the test days (see the notebook's next
+steps). Don't secretly add a holiday flag to just one candidate after seeing
+the errors. -->
 
 ---
 
-# Your recommendation needs boundaries
+# A recommendation, with its limits
 
 > For **this series, horizon, and three cutoffs**, I would choose ___
-> because ___. Before deployment I would test ___.
+> because ___. Before using it for real I would test ___.
 
 One series is not a universal benchmark.  
 Three folds are not a significance study.  
@@ -280,7 +284,7 @@ Public data may overlap with pretraining.
 
 <!-- 1:17–1:25. Pair discussion and written recommendation.
 If no foundation artifacts were available, explicitly state the
-foundation-versus-baseline question remains unanswered. -->
+question "does a foundation model beat the baseline?" is still open. -->
 
 ---
 
@@ -288,30 +292,31 @@ foundation-versus-baseline question remains unanswered. -->
 
 Did you change your opening vote?
 
-**Exit ticket**
+**Talk it over with your partner**
 
-One leakage risk  
-One useful baseline  
-One thing this experiment cannot establish
+How can the future leak into a forecast?  
+Why compare with a simple baseline?  
+What can this experiment not tell us?
 
 **You can now run a fair forecasting comparison.**
 
 <!-- 1:25–1:30. Re-run poll, celebrate justified changes of mind.
-Save/download notebooks. Move to optional slides only after the 90-minute core. -->
+Save/download the notebook. Move to optional slides only after the 90-minute core. -->
 
 ---
 
 # Q&A: choose a direction
 
 **Uncertainty:** are 80% intervals calibrated?  
-**Covariates:** what will truly be known in advance?  
+**Covariates:** a holiday flag? What is known in advance?  
 **Robustness:** other seasons, horizons, and series?  
 **Operations:** latency, monitoring, licenses, drift?
 
 30 minutes for your questions and use cases.
 
 <!-- 1:30–2:00. Let participants choose the order. If they want code,
-optional Prophet is already in notebook 2. No need to add a new notebook.
+optional Prophet and the holiday-flag ideas are in Part 4 of the notebook.
+No need to add a new notebook.
 Keep uncertainty claims separate from point-error rankings. -->
 
 ---
@@ -352,9 +357,9 @@ Exact implementation and papers are linked in TUTORIAL.md. -->
 
 # Take this workflow with you
 
-Define the decision → establish the baseline → respect time
+Decide what to forecast → look at the history → set a baseline
 
-Forecast → backtest → inspect misses → qualify the conclusion
+Forecast → backtest → discuss the results, the limits and the next steps
 
 **Read next:** `TUTORIAL.md`  
 **Run later:** `SETUP.md`  
