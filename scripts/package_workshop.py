@@ -23,7 +23,7 @@ common = [
     "requirements/core.txt", "requirements/jupyter.txt", "requirements/foundation.txt",
     "requirements/prophet.txt", "workshop.py", ".gitignore",
     "data/README.md", "data/daily_births.csv",
-    "scripts/check_environment.py", "scripts/rehearse.py",
+    "scripts/check_environment.py", "scripts/download_weights.py", "scripts/rehearse.py",
 ]
 instructor = [
     "TUTORIAL.md", "slides.md",
