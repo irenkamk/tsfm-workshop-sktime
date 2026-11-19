@@ -20,7 +20,7 @@ model's weights download the first time it runs (or via
 ## Google Colab (option 2: nothing to install locally)
 
 Upload `00_setup_check.ipynb`, then run its first cell and select the setup ZIP
-(on the day, the same cell in notebook 1 and 2 takes the full ZIP).
+(on the day, the same cell in `01_forecasting_workshop.ipynb` takes the full ZIP).
 The archive must contain the top-level `tsfm-workshop/` folder. This puts the
 data, helpers, requirements, and saved results next to the notebook runtime.
 Use only the organizer's trusted ZIP.
