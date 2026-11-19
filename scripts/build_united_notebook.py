@@ -1,7 +1,7 @@
-"""Generate notebooks/01_forecasting_workshop.ipynb: notebooks 01 and 02 in one.
+"""Generate notebooks/01_forecasting_workshop.ipynb, the single lesson notebook.
 
-A simpler, single-flow version of the two lesson notebooks. It has its own
-generator so that rebuilding it never touches 00, 01 or 02 (build_notebooks.py).
+One 90-minute flow (it replaced the earlier notebooks 01 and 02). The setup
+notebook 00 has its own generator, build_notebooks.py.
 """
 from pathlib import Path
 from textwrap import dedent
@@ -65,7 +65,7 @@ cells = [
 
     | Part | What you do | Time |
     |---|---|---|
-    | **0. Setup** | Make your prediction, load the workshop files, check the environment | 5 min |
+    | **0. Setup** | Make your prediction, load the workshop files, install packages if needed, check the environment | 5 min |
     | **1. Look at the data** | Plot the series and spot the weekly pattern | 8 min |
     | **2. Make one forecast** | Split the data without leaking the future, build a baseline, try a pretrained model | 32 min |
     | **3. Compare the models** | Backtest, error measures, leaderboard, recommendation | 40 min |
@@ -98,8 +98,8 @@ cells = [
     **Code → Download ZIP**, or from the organizer). **Local:** start Jupyter
     from the workshop folder.
 
-    Nothing is installed or downloaded here. If an import fails, run
-    `00_setup_check.ipynb` first.
+    This cell does not install anything or download model weights. Packages
+    missing? Use the install cell right after it.
     """),
     code("""
     import os
@@ -122,17 +122,51 @@ cells = [
     print("Workshop files:", ROOT)
     """, tags=["bootstrap"]),
     md("""
-    ### Check the setup and load the tools
+    ### SETUP ONLY — do this before the workshop
+    Set `INSTALL_CORE = True` if the core packages are missing, and
+    `INSTALL_FOUNDATION = True` to install the foundation-model packages.
+    You need the foundation packages to run the pretrained models yourself;
+    they are much larger than the core (see `SETUP.md`). Without them you
+    can still use the instructor's pre-computed forecasts. After
+    installation, restart the session if requested; rerun with both flags
+    `False`. A GPU is not necessary.
+    Read `SETUP.md` for downloads, CPU fallback, and troubleshooting.
     """),
     code("""
     import subprocess
 
+    def run(command):
+        # Run a command and show its output live, like a terminal.
+        process = subprocess.Popen(
+            command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+            text=True, bufsize=1,
+        )
+        for line in process.stdout:
+            print(line, end="")
+        return process.wait()
+
+    INSTALL_CORE = False
+    INSTALL_FOUNDATION = False
+    for wanted, name in ((INSTALL_CORE, "core"), (INSTALL_FOUNDATION, "foundation")):
+        if wanted:
+            print(f"Installing {name} packages: this can take several minutes...")
+            if run([sys.executable, "-m", "pip", "install", "-r", f"requirements/{name}.txt"]):
+                raise RuntimeError(f"Installing {name} failed. Read the messages above.")
+            print(f"Finished installing {name} packages.")
+    """),
+    md("""
+    ### Check the setup and load the tools
+    """),
+    code("""
     # Runs scripts/check_environment.py: a quick forecast on the bundled data.
     check = subprocess.run(
         [sys.executable, "scripts/check_environment.py"], capture_output=True, text=True
     )
     if check.returncode:
-        raise RuntimeError(check.stdout + check.stderr + "\\nRun 00_setup_check.ipynb first, or see SETUP.md.")
+        raise RuntimeError(
+            check.stdout + check.stderr
+            + "\\nSet INSTALL_CORE = True in the install cell above and run it, or see SETUP.md."
+        )
     print(check.stdout.strip().splitlines()[-1])
 
     import numpy as np

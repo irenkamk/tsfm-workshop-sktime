@@ -1,4 +1,4 @@
-"""Execute solved copies of both notebooks without changing student notebooks."""
+"""Execute solved copies of the notebooks without changing student notebooks."""
 from pathlib import Path
 import tempfile
 
