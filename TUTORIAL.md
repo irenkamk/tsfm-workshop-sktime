@@ -1,8 +1,7 @@
 # Can AI Predict the Future? A practical model guide
 
-**Reading date: 15 November 2026.** This guide covers the three models we use
-in the workshop: Chronos-2, TimesFM **2.5** and **t0-gamma**. It does not cover
-whichever checkpoint is newest. Package versions and wrapper behavior refer to
+This guide covers the three models we use
+in the workshop: Chronos-2, TimesFM **2.5** and **t0-gamma**. Package versions and wrapper behavior refer to
 sktime **1.3.0**. Software, model cards, access rules and hosted services can
 change.
 
